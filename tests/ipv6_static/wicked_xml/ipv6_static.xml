@@ -1,0 +1,25 @@
+<interface origin="compat:suse:/etc/sysconfig/network/ifcfg-eth4">
+  <name>eth4</name>
+  <control>
+    <mode>boot</mode>
+  </control>
+  <firewall/>
+  <link/>
+  <ipv4>
+    <enabled>true</enabled>
+    <arp-verify>true</arp-verify>
+  </ipv4>
+  <ipv6>
+    <enabled>true</enabled>
+    <privacy>prefer-public</privacy>
+    <accept-redirects>false</accept-redirects>
+  </ipv6>
+  <ipv6:static>
+    <address>
+      <local>2001:db8:0:1::5/64</local>
+    </address>
+    <address>
+      <local>2001:db8:0:2::5/64</local>
+    </address>
+  </ipv6:static>
+</interface>
