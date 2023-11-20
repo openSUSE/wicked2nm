@@ -39,7 +39,7 @@ for test_dir in ${TEST_DIRS}; do
         error_msg ${test_dir} "show failed"
         RESULT=1
     fi
-    $MIGRATE_WICKED_BIN migrate $test_dir/wicked_xml
+    $MIGRATE_WICKED_BIN migrate -c $test_dir/wicked_xml
     if [ $? -ne 0 ]; then
         error_msg ${test_dir} "migration failed"
         RESULT=1

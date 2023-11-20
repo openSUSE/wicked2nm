@@ -1,4 +1,4 @@
-use crate::reader::read as wicked_read;
+use crate::{reader::read as wicked_read, MIGRATION_SETTINGS};
 use agama_dbus_server::network::{model, Adapter, NetworkManagerAdapter, NetworkState};
 use std::error::Error;
 use tokio::{runtime::Handle, task};
@@ -18,6 +18,13 @@ impl Adapter for WickedAdapter {
         task::block_in_place(|| {
             Handle::current().block_on(async {
                 let interfaces = wicked_read(self.paths.clone())?;
+
+                if !MIGRATION_SETTINGS.get().unwrap().continue_migration
+                    && interfaces.error.is_some()
+                {
+                    Err(interfaces.error.unwrap())?
+                }
+
                 let mut state = NetworkState::new(vec![], vec![]);
 
                 for interface in interfaces.interfaces {

@@ -8,6 +8,7 @@ use log::*;
 use migrate::migrate;
 use reader::read as wicked_read;
 use std::process::{ExitCode, Termination};
+use tokio::sync::OnceCell;
 
 #[derive(Parser)]
 #[command(name = "migrate-wicked", version, about, long_about = None)]
@@ -23,6 +24,10 @@ struct Cli {
 struct GlobalOpts {
     #[arg(long, global = true, default_value_t = LevelFilter::Warn, value_parser = clap::builder::PossibleValuesParser::new(["TRACE", "DEBUG", "INFO", "WARN", "ERROR"]).map(|s| s.parse::<LevelFilter>().unwrap()),)]
     pub log_level: LevelFilter,
+
+    /// Suppress warnings about not handled settings
+    #[arg(short, long, global = true)]
+    suppress_unhandled_warnings: bool,
 }
 
 #[derive(Subcommand)]
@@ -40,6 +45,10 @@ pub enum Commands {
     Migrate {
         /// Wicked XML Files or directories where the wicked xml configs are located
         paths: Vec<String>,
+
+        /// Continue migration if warnings are encountered
+        #[arg(short, long, global = true)]
+        continue_migration: bool,
     },
 }
 
@@ -56,6 +65,13 @@ pub enum Format {
 async fn run_command(cli: Cli) -> anyhow::Result<()> {
     match cli.command {
         Commands::Show { paths, format } => {
+            MIGRATION_SETTINGS
+                .set(MigrationSettings {
+                    suppress_unhandled_warnings: cli.global_opts.suppress_unhandled_warnings,
+                    continue_migration: true,
+                })
+                .expect("MIGRATION_SETTINGS was set too early");
+
             let interfaces_result = wicked_read(paths)?;
             let output: String = match format {
                 Format::Json => serde_json::to_string(&interfaces_result.interfaces)?,
@@ -69,9 +85,21 @@ async fn run_command(cli: Cli) -> anyhow::Result<()> {
             println!("{}", output);
             Ok(())
         }
-        Commands::Migrate { paths } => {
-            migrate(paths).await.unwrap();
-            Ok(())
+        Commands::Migrate {
+            paths,
+            continue_migration,
+        } => {
+            MIGRATION_SETTINGS
+                .set(MigrationSettings {
+                    suppress_unhandled_warnings: cli.global_opts.suppress_unhandled_warnings,
+                    continue_migration,
+                })
+                .expect("MIGRATION_SETTINGS was set too early");
+
+            match migrate(paths).await {
+                Ok(()) => Ok(()),
+                Err(e) => Err(anyhow::anyhow!("Migration failed: {:?}", e)),
+            }
         }
     }
 }
@@ -90,6 +118,14 @@ impl Termination for CliResult {
     }
 }
 
+#[derive(Debug)]
+struct MigrationSettings {
+    suppress_unhandled_warnings: bool,
+    continue_migration: bool,
+}
+
+static MIGRATION_SETTINGS: OnceCell<MigrationSettings> = OnceCell::const_new();
+
 #[tokio::main]
 async fn main() -> CliResult {
     let cli = Cli::parse();
@@ -106,5 +142,6 @@ async fn main() -> CliResult {
         eprintln!("{:?}", error);
         return CliResult::Error;
     }
+
     CliResult::Ok
 }
