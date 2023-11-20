@@ -325,8 +325,8 @@ where
     Ok(Slaves::deserialize(deserializer)?.slave)
 }
 
-impl From<Bond> for model::BondConfig {
-    fn from(bond: Bond) -> model::BondConfig {
+impl From<&Bond> for model::BondConfig {
+    fn from(bond: &Bond) -> model::BondConfig {
         let mut h: HashMap<String, String> = HashMap::new();
 
         h.insert(String::from("mode"), bond.mode.to_string());
@@ -433,7 +433,7 @@ impl From<Bond> for model::BondConfig {
 
         model::BondConfig {
             options: h,
-            hwaddr: match bond.address {
+            hwaddr: match &bond.address {
                 Some(s) => model::MacAddr::try_from(s.as_ref()).ok(),
                 _ => None,
             },
@@ -441,55 +441,73 @@ impl From<Bond> for model::BondConfig {
     }
 }
 
-impl From<Interface> for model::Connection {
-    fn from(ifc: Interface) -> model::Connection {
+pub struct ConnectionResult {
+    pub connection: model::Connection,
+    pub errors: Vec<anyhow::Error>,
+}
+
+pub struct IpConfigResult {
+    ip_config: IpConfig,
+    errors: Vec<anyhow::Error>,
+}
+
+impl Interface {
+    pub fn to_connection(&self) -> Result<ConnectionResult, anyhow::Error> {
+        let ip_config = self.to_ip_config()?;
         let mut base = model::BaseConnection {
-            id: ifc.name.clone(),
-            interface: ifc.name.clone(),
-            ip_config: (&ifc).into(),
+            id: self.name.clone(),
+            interface: self.name.clone(),
+            ip_config: ip_config.ip_config,
             ..Default::default()
         };
 
-        if ifc.link.kind.is_some() && ifc.link.parent.is_some() {
-            let interface = ifc.link.parent.clone().unwrap();
-            let kind = match ifc.link.kind {
+        if self.link.kind.is_some() && self.link.parent.is_some() {
+            let interface = self.link.parent.clone().unwrap();
+            let kind = match &self.link.kind {
                 Some(p) => match &p {
                     ParentKind::Bond => model::ParentKind::Bond,
                 },
-                None => panic!("Missing ParentType"),
+                None => return Err(anyhow::anyhow!("Missing ParentType for {}", self.name)),
             };
             base.parent = Some(Parent { interface, kind });
         }
 
-        if let Some(b) = ifc.bond {
-            model::Connection::Bond(model::BondConnection {
-                base,
-                bond: b.into(),
-            })
-        } else {
-            model::Connection::Ethernet(model::EthernetConnection { base })
-        }
+        Ok(ConnectionResult {
+            connection: if let Some(b) = &self.bond {
+                model::Connection::Bond(model::BondConnection {
+                    base,
+                    bond: b.into(),
+                })
+            } else {
+                model::Connection::Ethernet(model::EthernetConnection { base })
+            },
+            errors: ip_config.errors,
+        })
     }
-}
 
-impl From<&Interface> for IpConfig {
-    fn from(val: &Interface) -> Self {
-        let method4 = Ipv4Method::from_str(if val.ipv4.enabled && val.ipv4_static.is_some() {
+    pub fn to_ip_config(&self) -> Result<IpConfigResult, anyhow::Error> {
+        let mut connection_result = IpConfigResult {
+            ip_config: IpConfig {
+                ..Default::default()
+            },
+            errors: vec![],
+        };
+        let method4 = Ipv4Method::from_str(if self.ipv4.enabled && self.ipv4_static.is_some() {
             "manual"
-        } else if !val.ipv4.enabled {
+        } else if !self.ipv4.enabled {
             "disabled"
         } else {
             "auto"
         })
         .unwrap();
-        let method6 = Ipv6Method::from_str(if val.ipv6.enabled && val.ipv6_static.is_some() {
+        let method6 = Ipv6Method::from_str(if self.ipv6.enabled && self.ipv6_static.is_some() {
             "manual"
-        } else if val.ipv6.enabled
-            && val.ipv6_dhcp.is_some()
-            && val.ipv6_dhcp.as_ref().unwrap().mode == "managed"
+        } else if self.ipv6.enabled
+            && self.ipv6_dhcp.is_some()
+            && self.ipv6_dhcp.as_ref().unwrap().mode == "managed"
         {
             "dhcp"
-        } else if !val.ipv6.enabled {
+        } else if !self.ipv6.enabled {
             "disabled"
         } else {
             "auto"
@@ -499,7 +517,7 @@ impl From<&Interface> for IpConfig {
         let mut addresses: Vec<IpInet> = vec![];
         let mut gateway4 = None;
         let mut gateway6 = None;
-        if let Some(ipv4_static) = &val.ipv4_static {
+        if let Some(ipv4_static) = &self.ipv4_static {
             if let Some(addresses_in) = &ipv4_static.addresses {
                 for addr in addresses_in {
                     addresses.push(IpInet::from_str(addr.local.as_str()).unwrap());
@@ -512,7 +530,9 @@ impl From<&Interface> for IpConfig {
                         // the logged warning isn't really true for multiple hops
                         // as gateways just can't have multiple nexthops AFAICT
                         if gateway4.is_some() || nexthops.len() > 1 {
-                            log::warn!("Multiple gateways aren't supported yet");
+                            connection_result.errors.push(anyhow::anyhow!(
+                                "Multipath routing isn't natively supported by NetworkManager"
+                            ));
                         } else {
                             gateway4 = Some(IpAddr::from_str(&nexthops[0].gateway).unwrap());
                         }
@@ -520,7 +540,7 @@ impl From<&Interface> for IpConfig {
                 }
             }
         }
-        if let Some(ipv6_static) = &val.ipv6_static {
+        if let Some(ipv6_static) = &self.ipv6_static {
             if let Some(addresses_in) = &ipv6_static.addresses {
                 for addr in addresses_in {
                     addresses.push(IpInet::from_str(addr.local.as_str()).unwrap());
@@ -533,7 +553,9 @@ impl From<&Interface> for IpConfig {
                         // the logged warning isn't really true for multiple hops
                         // as gateways just can't have multiple nexthops AFAICT
                         if gateway6.is_some() || nexthops.len() > 1 {
-                            log::warn!("Multiple gateways aren't supported yet");
+                            connection_result.errors.push(anyhow::anyhow!(
+                                "Multipath routing isn't natively supported by NetworkManager"
+                            ));
                         } else {
                             gateway6 = Some(IpAddr::from_str(&nexthops[0].gateway).unwrap());
                         }
@@ -542,14 +564,15 @@ impl From<&Interface> for IpConfig {
             }
         }
 
-        IpConfig {
+        connection_result.ip_config = IpConfig {
             addresses,
             method4,
             method6,
             gateway4,
             gateway6,
             ..Default::default()
-        }
+        };
+        Ok(connection_result)
     }
 }
 
@@ -593,7 +616,8 @@ mod tests {
             ..Default::default()
         };
 
-        let static_connection: model::Connection = static_interface.into();
+        let static_connection: model::Connection =
+            static_interface.to_connection().unwrap().connection;
         assert_eq!(
             static_connection.base().ip_config.method4,
             Ipv4Method::Manual
@@ -652,7 +676,8 @@ mod tests {
             ..Default::default()
         };
 
-        let static_connection: model::Connection = static_interface.into();
+        let static_connection: model::Connection =
+            static_interface.to_connection().unwrap().connection;
         assert_eq!(static_connection.base().ip_config.method4, Ipv4Method::Auto);
         assert_eq!(static_connection.base().ip_config.method6, Ipv6Method::Auto);
         assert_eq!(static_connection.base().ip_config.addresses.len(), 0);
@@ -694,7 +719,7 @@ mod tests {
             address: Some(String::from("02:11:22:33:44:55")),
         };
 
-        let bondconfig: model::BondConfig = bond.into();
+        let bondconfig: model::BondConfig = (&bond).into();
         let s = HashMap::from([
             ("xmit_hash_policy", String::from("encap34")),
             ("packets_per_slave", 23.to_string()),

@@ -28,8 +28,26 @@ impl Adapter for WickedAdapter {
                 let mut state = NetworkState::new(vec![], vec![]);
 
                 for interface in interfaces.interfaces {
-                    let conn: model::Connection = interface.into();
-                    state.add_connection(conn)?;
+                    let connection_result = interface.to_connection()?;
+                    if !connection_result.errors.is_empty()
+                        && !MIGRATION_SETTINGS
+                            .get()
+                            .unwrap()
+                            .suppress_unhandled_warnings
+                    {
+                        for connection_error in &connection_result.errors {
+                            log::warn!("{}", connection_error);
+                        }
+                    }
+                    if !connection_result.errors.is_empty()
+                        && !MIGRATION_SETTINGS.get().unwrap().continue_migration
+                    {
+                        Err(anyhow::anyhow!(
+                            "Migration of {} failed",
+                            connection_result.connection.id()
+                        ))?
+                    }
+                    state.add_connection(connection_result.connection)?;
                 }
                 Ok(state)
             })
