@@ -34,16 +34,30 @@ fi
 
 for test_dir in ${TEST_DIRS}; do
     echo -e "${BOLD}Testing ${test_dir}${NC}"
+
+    if [[ $test_dir == *"failure" ]]; then
+        expect_fail=true
+    else
+        expect_fail=false
+    fi
+
     $MIGRATE_WICKED_BIN show $test_dir/wicked_xml
-    if [ $? -ne 0 ]; then
+    if [ $? -ne 0 ] && [ "$expect_fail" = false ]; then
         error_msg ${test_dir} "show failed"
         RESULT=1
     fi
-    $MIGRATE_WICKED_BIN migrate -c $test_dir/wicked_xml
-    if [ $? -ne 0 ]; then
+
+    if [ "$expect_fail" = true ]; then
+        $MIGRATE_WICKED_BIN migrate $test_dir/wicked_xml
+    else
+        $MIGRATE_WICKED_BIN migrate -c $test_dir/wicked_xml
+    fi
+    if [ $? -ne 0 ] && [ "$expect_fail" = false ]; then
         error_msg ${test_dir} "migration failed"
         RESULT=1
         continue
+    elif [ $? -ne 0 ] && [ "$expect_fail" = true ]; then
+        echo -e "${GREEN}Migration for $test_dir failed as expected${NC}"
     fi
     for cmp_file in $(ls $test_dir/system-connections/); do
         diff --unified=0 --color=always -I uuid $test_dir/system-connections/$cmp_file /etc/NetworkManager/system-connections/${cmp_file/\./\*.}
