@@ -1,15 +1,15 @@
 use crate::interface::{Interface, ParentKind};
-use quick_xml::de::from_str;
 use regex::Regex;
 use std::collections::HashMap;
 use std::fs::{self, read_dir};
 use std::path::{Path, PathBuf};
 
-pub fn read_xml(str: &str) -> Result<Vec<Interface>, quick_xml::DeError> {
-    from_str(replace_colons(str).as_str())
+pub struct InterfacesResult {
+    pub interfaces: Vec<Interface>,
+    pub error: Option<anyhow::Error>,
 }
 
-pub fn read_xml_file(path: PathBuf) -> Result<Vec<Interface>, anyhow::Error> {
+pub fn read_xml_file(path: PathBuf) -> Result<InterfacesResult, anyhow::Error> {
     let contents = match fs::read_to_string(path.clone()) {
         Ok(contents) => contents,
         Err(e) => {
@@ -20,7 +20,28 @@ pub fn read_xml_file(path: PathBuf) -> Result<Vec<Interface>, anyhow::Error> {
             ))
         }
     };
-    Ok(read_xml(contents.as_str())?)
+    let replaced_string = replace_colons(contents.as_str());
+    let deserializer = &mut quick_xml::de::Deserializer::from_str(replaced_string.as_str());
+    let mut unhandled_fields = vec![];
+    let interfaces: Vec<Interface> = serde_ignored::deserialize(deserializer, |path| {
+        unhandled_fields.push(path.to_string());
+    })?;
+    let mut result = InterfacesResult {
+        interfaces,
+        error: None,
+    };
+    if !unhandled_fields.is_empty() {
+            for unused_str in unhandled_fields {
+                let split_str = unused_str.split_once('.').unwrap();
+                log::warn!(
+                    "Unhandled field in interface {}: {}",
+                    result.interfaces[split_str.0.parse::<usize>().unwrap()].name,
+                    split_str.1
+                );
+            }
+        result.error = Some(anyhow::anyhow!("Unhandled fields"))
+    }
+    Ok(result)
 }
 
 fn replace_colons(colon_string: &str) -> String {
@@ -69,21 +90,32 @@ fn recurse_files(path: impl AsRef<Path>) -> std::io::Result<Vec<PathBuf>> {
     Ok(buf)
 }
 
-pub fn read(paths: Vec<String>) -> Result<Vec<Interface>, anyhow::Error> {
-    let mut interfaces: Vec<Interface> = vec![];
+pub fn read(paths: Vec<String>) -> Result<InterfacesResult, anyhow::Error> {
+    let mut result = InterfacesResult {
+        interfaces: vec![],
+        error: None,
+    };
     for path in paths {
         let path: PathBuf = path.into();
         if path.is_dir() {
             let files = recurse_files(path)?;
             for file in files {
-                interfaces.append(&mut read_xml_file(file)?);
+                let mut read_xml = read_xml_file(file)?;
+                if result.error.is_none() && read_xml.error.is_some() {
+                    result.error = read_xml.error
+                }
+                result.interfaces.append(&mut read_xml.interfaces);
             }
         } else {
-            interfaces.append(&mut read_xml_file(path)?);
+            let mut read_xml = read_xml_file(path)?;
+            if result.error.is_none() && read_xml.error.is_some() {
+                result.error = read_xml.error
+            }
+            result.interfaces.append(&mut read_xml.interfaces);
         }
     }
-    post_process_interface(&mut interfaces);
-    Ok(interfaces)
+    post_process_interface(&mut result.interfaces);
+    Ok(result)
 }
 
 #[cfg(test)]
@@ -136,7 +168,10 @@ mod tests {
                 </bond>
             </interface>
             "##;
-        let ifc = read_xml(xml).unwrap().pop().unwrap();
+        let ifc = quick_xml::de::from_str::<Vec<Interface>>(replace_colons(xml).as_str())
+            .unwrap()
+            .pop()
+            .unwrap();
         assert!(ifc.bond.is_some());
         let bond = ifc.bond.unwrap();
 
@@ -191,7 +226,7 @@ mod tests {
                 </ipv4:static>
             </interface>
             "##;
-        let err = read_xml(xml);
+        let err = quick_xml::de::from_str::<Vec<Interface>>(replace_colons(xml).as_str());
         assert!(err.is_err());
     }
 }

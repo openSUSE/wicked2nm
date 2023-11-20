@@ -20,7 +20,7 @@ impl Adapter for WickedAdapter {
                 let interfaces = wicked_read(self.paths.clone())?;
                 let mut state = NetworkState::new(vec![], vec![]);
 
-                for interface in interfaces {
+                for interface in interfaces.interfaces {
                     let conn: model::Connection = interface.into();
                     state.add_connection(conn)?;
                 }

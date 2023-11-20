@@ -56,13 +56,15 @@ pub enum Format {
 async fn run_command(cli: Cli) -> anyhow::Result<()> {
     match cli.command {
         Commands::Show { paths, format } => {
-            let interfaces = wicked_read(paths)?;
+            let interfaces_result = wicked_read(paths)?;
             let output: String = match format {
-                Format::Json => serde_json::to_string(&interfaces)?,
-                Format::PrettyJson => serde_json::to_string_pretty(&interfaces)?,
-                Format::Yaml => serde_yaml::to_string(&interfaces)?,
-                Format::Xml => quick_xml::se::to_string_with_root("interface", &interfaces)?,
-                Format::Text => format!("{:?}", interfaces),
+                Format::Json => serde_json::to_string(&interfaces_result.interfaces)?,
+                Format::PrettyJson => serde_json::to_string_pretty(&interfaces_result.interfaces)?,
+                Format::Yaml => serde_yaml::to_string(&interfaces_result.interfaces)?,
+                Format::Xml => {
+                    quick_xml::se::to_string_with_root("interface", &interfaces_result.interfaces)?
+                }
+                Format::Text => format!("{:?}", interfaces_result.interfaces),
             };
             println!("{}", output);
             Ok(())
