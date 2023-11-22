@@ -1,4 +1,4 @@
-use agama_dbus_server::network::model::{self, IpConfig, Ipv4Method, Ipv6Method, Parent};
+use agama_dbus_server::network::model::{self, IpConfig, IpRoute, Ipv4Method, Ipv6Method, Parent};
 use cidr::IpInet;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_with::{
@@ -513,8 +513,8 @@ impl Interface {
         };
 
         let mut addresses: Vec<IpInet> = vec![];
-        let mut gateway4 = None;
-        let mut gateway6 = None;
+        let mut new_routes4: Vec<IpRoute> = vec![];
+        let mut new_routes6: Vec<IpRoute> = vec![];
         if let Some(ipv4_static) = &self.ipv4_static {
             if let Some(addresses_in) = &ipv4_static.addresses {
                 for addr in addresses_in {
@@ -523,18 +523,13 @@ impl Interface {
             }
             if let Some(routes) = &ipv4_static.routes {
                 for route in routes {
-                    if let Some(nexthops) = &route.nexthops {
-                        // TODO fix when implementing better route handling
-                        // the logged warning isn't really true for multiple hops
-                        // as gateways just can't have multiple nexthops AFAICT
-                        if gateway4.is_some() || nexthops.len() > 1 {
-                            connection_result.warnings.push(anyhow::anyhow!(
-                                "Multipath routing isn't natively supported by NetworkManager"
-                            ));
-                        } else {
-                            gateway4 = Some(IpAddr::from_str(&nexthops[0].gateway).unwrap());
+                    new_routes4.push(match route.try_into() {
+                        Ok(route) => route,
+                        Err(e) => {
+                            connection_result.warnings.push(e);
+                            continue;
                         }
-                    }
+                    });
                 }
             }
         }
@@ -546,31 +541,72 @@ impl Interface {
             }
             if let Some(routes) = &ipv6_static.routes {
                 for route in routes {
-                    if let Some(nexthops) = &route.nexthops {
-                        // TODO fix when implementing better route handling
-                        // the logged warning isn't really true for multiple hops
-                        // as gateways just can't have multiple nexthops AFAICT
-                        if gateway6.is_some() || nexthops.len() > 1 {
-                            connection_result.warnings.push(anyhow::anyhow!(
-                                "Multipath routing isn't natively supported by NetworkManager"
-                            ));
-                        } else {
-                            gateway6 = Some(IpAddr::from_str(&nexthops[0].gateway).unwrap());
+                    new_routes6.push(match route.try_into() {
+                        Ok(route) => route,
+                        Err(e) => {
+                            connection_result.warnings.push(e);
+                            continue;
                         }
-                    }
+                    });
                 }
             }
         }
+
+        let routes4 = if !new_routes4.is_empty() {
+            Some(new_routes4)
+        } else {
+            None
+        };
+        let routes6 = if !new_routes6.is_empty() {
+            Some(new_routes6)
+        } else {
+            None
+        };
 
         connection_result.ip_config = IpConfig {
             addresses,
             method4,
             method6,
-            gateway4,
-            gateway6,
+            routes4,
+            routes6,
             ..Default::default()
         };
         Ok(connection_result)
+    }
+}
+
+impl TryFrom<&Route> for IpRoute {
+    type Error = anyhow::Error;
+    fn try_from(route: &Route) -> Result<Self, Self::Error> {
+        let mut next_hop: Option<IpAddr> = None;
+        if let Some(nexthops) = &route.nexthops {
+            if nexthops.len() > 1 {
+                return Err(anyhow::anyhow!(
+                    "Multipath routing isn't natively supported by NetworkManager"
+                ));
+            } else {
+                next_hop = Some(IpAddr::from_str(&nexthops[0].gateway).unwrap());
+            }
+        }
+        let destination = if route.destination.is_some() {
+            IpInet::from_str(route.destination.clone().unwrap().as_str())?
+        } else if next_hop.is_some() {
+            // default route
+            let default_ip = if next_hop.unwrap().is_ipv4() {
+                IpAddr::from_str("0.0.0.0")?
+            } else {
+                IpAddr::from_str("::")?
+            };
+            IpInet::new(default_ip, 0)?
+        } else {
+            return Err(anyhow::anyhow!("Error occurred when parsing a route"));
+        };
+        let metric = route.priority;
+        Ok(IpRoute {
+            destination,
+            next_hop,
+            metric,
+        })
     }
 }
 
@@ -638,22 +674,50 @@ mod tests {
                 .to_string(),
             "128"
         );
-        assert!(static_connection.base().ip_config.gateway4.is_some());
-        assert_eq!(
+        assert!(static_connection.base().ip_config.routes4.is_some());
+        assert!(
             static_connection
                 .base()
                 .ip_config
-                .gateway4
+                .routes4
+                .clone()
+                .unwrap()
+                .len()
+                == 1
+        );
+        assert_eq!(
+            static_connection.base().ip_config.routes4.clone().unwrap()[0]
+                .destination
+                .to_string(),
+            "0.0.0.0/0"
+        );
+        assert_eq!(
+            static_connection.base().ip_config.routes4.clone().unwrap()[0]
+                .next_hop
                 .unwrap()
                 .to_string(),
             "127.0.0.1"
         );
-        assert!(static_connection.base().ip_config.gateway6.is_some());
-        assert_eq!(
+        assert!(static_connection.base().ip_config.routes6.is_some());
+        assert!(
             static_connection
                 .base()
                 .ip_config
-                .gateway6
+                .routes6
+                .clone()
+                .unwrap()
+                .len()
+                == 1
+        );
+        assert_eq!(
+            static_connection.base().ip_config.routes6.clone().unwrap()[0]
+                .destination
+                .to_string(),
+            "::/0"
+        );
+        assert_eq!(
+            static_connection.base().ip_config.routes6.clone().unwrap()[0]
+                .next_hop
                 .unwrap()
                 .to_string(),
             "::1"

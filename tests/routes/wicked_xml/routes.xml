@@ -18,9 +18,35 @@
     </address>
     <route>
       <destination>192.168.101.0/24</destination>
+      <nexthop>
+        <gateway>192.168.101.1</gateway>
+      </nexthop>
     </route>
     <route>
       <destination>192.168.102.0/24</destination>
+      <nexthop>
+        <gateway>192.168.102.1</gateway>
+      </nexthop>
+      <priority>1</priority>
+    </route>
+    <route>
+      <destination>192.168.102.0/24</destination>
+      <nexthop>
+        <gateway>192.168.102.2</gateway>
+      </nexthop>
+      <priority>2</priority>
+    </route>
+    <route>
+      <destination>192.168.103.0/24</destination>
+      <nexthop>
+        <gateway>192.168.101.1</gateway>
+      </nexthop>
+    </route>
+    <route>
+      <destination>192.168.104.0/24</destination>
+      <nexthop>
+        <gateway>192.168.102.1</gateway>
+      </nexthop>
     </route>
     <route>
       <nexthop>
@@ -39,6 +65,12 @@
       <local>2001:db8:1::5/64</local>
     </address>
     <route>
+      <nexthop>
+        <gateway>2001:db8:1::1</gateway>
+      </nexthop>
+    </route>
+    <route>
+      <destination>2001:db8:1::/64</destination>
       <nexthop>
         <gateway>2001:db8:1::1</gateway>
       </nexthop>
