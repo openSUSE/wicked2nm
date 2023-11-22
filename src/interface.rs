@@ -443,12 +443,12 @@ impl From<&Bond> for model::BondConfig {
 
 pub struct ConnectionResult {
     pub connection: model::Connection,
-    pub errors: Vec<anyhow::Error>,
+    pub warnings: Vec<anyhow::Error>,
 }
 
 pub struct IpConfigResult {
     ip_config: IpConfig,
-    errors: Vec<anyhow::Error>,
+    warnings: Vec<anyhow::Error>,
 }
 
 impl Interface {
@@ -481,7 +481,7 @@ impl Interface {
             } else {
                 model::Connection::Ethernet(model::EthernetConnection { base })
             },
-            errors: ip_config.errors,
+            warnings: ip_config.warnings,
         })
     }
 
@@ -490,7 +490,7 @@ impl Interface {
             ip_config: IpConfig {
                 ..Default::default()
             },
-            errors: vec![],
+            warnings: vec![],
         };
         let method4 = if self.ipv4.enabled && self.ipv4_static.is_some() {
             Ipv4Method::Manual
@@ -528,7 +528,7 @@ impl Interface {
                         // the logged warning isn't really true for multiple hops
                         // as gateways just can't have multiple nexthops AFAICT
                         if gateway4.is_some() || nexthops.len() > 1 {
-                            connection_result.errors.push(anyhow::anyhow!(
+                            connection_result.warnings.push(anyhow::anyhow!(
                                 "Multipath routing isn't natively supported by NetworkManager"
                             ));
                         } else {
@@ -551,7 +551,7 @@ impl Interface {
                         // the logged warning isn't really true for multiple hops
                         // as gateways just can't have multiple nexthops AFAICT
                         if gateway6.is_some() || nexthops.len() > 1 {
-                            connection_result.errors.push(anyhow::anyhow!(
+                            connection_result.warnings.push(anyhow::anyhow!(
                                 "Multipath routing isn't natively supported by NetworkManager"
                             ));
                         } else {

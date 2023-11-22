@@ -20,26 +20,26 @@ impl Adapter for WickedAdapter {
                 let interfaces = wicked_read(self.paths.clone())?;
 
                 if !MIGRATION_SETTINGS.get().unwrap().continue_migration
-                    && interfaces.error.is_some()
+                    && interfaces.warning.is_some()
                 {
-                    Err(interfaces.error.unwrap())?
+                    Err(interfaces.warning.unwrap())?
                 }
 
                 let mut state = NetworkState::new(vec![], vec![]);
 
                 for interface in interfaces.interfaces {
                     let connection_result = interface.to_connection()?;
-                    if !connection_result.errors.is_empty()
+                    if !connection_result.warnings.is_empty()
                         && !MIGRATION_SETTINGS
                             .get()
                             .unwrap()
                             .suppress_unhandled_warnings
                     {
-                        for connection_error in &connection_result.errors {
+                        for connection_error in &connection_result.warnings {
                             log::warn!("{}", connection_error);
                         }
                     }
-                    if !connection_result.errors.is_empty()
+                    if !connection_result.warnings.is_empty()
                         && !MIGRATION_SETTINGS.get().unwrap().continue_migration
                     {
                         Err(anyhow::anyhow!(

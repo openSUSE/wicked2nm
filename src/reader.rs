@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 pub struct InterfacesResult {
     pub interfaces: Vec<Interface>,
-    pub error: Option<anyhow::Error>,
+    pub warning: Option<anyhow::Error>,
 }
 
 pub fn read_xml_file(path: PathBuf) -> Result<InterfacesResult, anyhow::Error> {
@@ -29,7 +29,7 @@ pub fn read_xml_file(path: PathBuf) -> Result<InterfacesResult, anyhow::Error> {
     })?;
     let mut result = InterfacesResult {
         interfaces,
-        error: None,
+        warning: None,
     };
     if !unhandled_fields.is_empty() {
         if !MIGRATION_SETTINGS
@@ -46,7 +46,7 @@ pub fn read_xml_file(path: PathBuf) -> Result<InterfacesResult, anyhow::Error> {
                 );
             }
         }
-        result.error = Some(anyhow::anyhow!("Unhandled fields"))
+        result.warning = Some(anyhow::anyhow!("Unhandled fields"))
     }
     Ok(result)
 }
@@ -100,7 +100,7 @@ fn recurse_files(path: impl AsRef<Path>) -> std::io::Result<Vec<PathBuf>> {
 pub fn read(paths: Vec<String>) -> Result<InterfacesResult, anyhow::Error> {
     let mut result = InterfacesResult {
         interfaces: vec![],
-        error: None,
+        warning: None,
     };
     for path in paths {
         let path: PathBuf = path.into();
@@ -108,15 +108,15 @@ pub fn read(paths: Vec<String>) -> Result<InterfacesResult, anyhow::Error> {
             let files = recurse_files(path)?;
             for file in files {
                 let mut read_xml = read_xml_file(file)?;
-                if result.error.is_none() && read_xml.error.is_some() {
-                    result.error = read_xml.error
+                if result.warning.is_none() && read_xml.warning.is_some() {
+                    result.warning = read_xml.warning
                 }
                 result.interfaces.append(&mut read_xml.interfaces);
             }
         } else {
             let mut read_xml = read_xml_file(path)?;
-            if result.error.is_none() && read_xml.error.is_some() {
-                result.error = read_xml.error
+            if result.warning.is_none() && read_xml.warning.is_some() {
+                result.warning = read_xml.warning
             }
             result.interfaces.append(&mut read_xml.interfaces);
         }
