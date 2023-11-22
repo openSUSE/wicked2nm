@@ -492,27 +492,25 @@ impl Interface {
             },
             errors: vec![],
         };
-        let method4 = Ipv4Method::from_str(if self.ipv4.enabled && self.ipv4_static.is_some() {
-            "manual"
+        let method4 = if self.ipv4.enabled && self.ipv4_static.is_some() {
+            Ipv4Method::Manual
         } else if !self.ipv4.enabled {
-            "disabled"
+            Ipv4Method::Disabled
         } else {
-            "auto"
-        })
-        .unwrap();
-        let method6 = Ipv6Method::from_str(if self.ipv6.enabled && self.ipv6_static.is_some() {
-            "manual"
+            Ipv4Method::Auto
+        };
+        let method6 = if self.ipv6.enabled && self.ipv6_static.is_some() {
+            Ipv6Method::Manual
         } else if self.ipv6.enabled
             && self.ipv6_dhcp.is_some()
             && self.ipv6_dhcp.as_ref().unwrap().mode == "managed"
         {
-            "dhcp"
+            Ipv6Method::Dhcp
         } else if !self.ipv6.enabled {
-            "disabled"
+            Ipv6Method::Disabled
         } else {
-            "auto"
-        })
-        .unwrap();
+            Ipv6Method::Auto
+        };
 
         let mut addresses: Vec<IpInet> = vec![];
         let mut gateway4 = None;
