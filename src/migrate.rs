@@ -25,20 +25,19 @@ impl Adapter for WickedAdapter {
 
         for interface in interfaces.interfaces {
             let connection_result = interface.to_connection()?;
-            if !connection_result.warnings.is_empty()
-                && !settings.suppress_unhandled_warnings
-            {
-                for connection_error in &connection_result.warnings {
-                    log::warn!("{}", connection_error);
+            if !connection_result.warnings.is_empty() {
+                if !settings.suppress_unhandled_warnings {
+                    for connection_error in &connection_result.warnings {
+                        log::warn!("{}", connection_error);
+                    }
                 }
-            }
-            if !connection_result.warnings.is_empty()
-                && !settings.continue_migration
-            {
-                return Err(anyhow::anyhow!(
-                    "Migration of {} failed",
-                    connection_result.connection.id()
-                ).into());
+                if !settings.continue_migration {
+                    return Err(anyhow::anyhow!(
+                        "Migration of {} failed",
+                        connection_result.connection.id()
+                    )
+                    .into());
+                }
             }
             state.add_connection(connection_result.connection)?;
         }
