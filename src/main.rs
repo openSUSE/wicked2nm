@@ -24,10 +24,6 @@ struct Cli {
 struct GlobalOpts {
     #[arg(long, global = true, default_value_t = LevelFilter::Warn, value_parser = clap::builder::PossibleValuesParser::new(["TRACE", "DEBUG", "INFO", "WARN", "ERROR"]).map(|s| s.parse::<LevelFilter>().unwrap()),)]
     pub log_level: LevelFilter,
-
-    /// Suppress warnings about not handled settings
-    #[arg(short, long, global = true)]
-    suppress_unhandled_warnings: bool,
 }
 
 #[derive(Subcommand)]
@@ -67,7 +63,6 @@ async fn run_command(cli: Cli) -> anyhow::Result<()> {
         Commands::Show { paths, format } => {
             MIGRATION_SETTINGS
                 .set(MigrationSettings {
-                    suppress_unhandled_warnings: cli.global_opts.suppress_unhandled_warnings,
                     continue_migration: true,
                 })
                 .expect("MIGRATION_SETTINGS was set too early");
@@ -90,10 +85,7 @@ async fn run_command(cli: Cli) -> anyhow::Result<()> {
             continue_migration,
         } => {
             MIGRATION_SETTINGS
-                .set(MigrationSettings {
-                    suppress_unhandled_warnings: cli.global_opts.suppress_unhandled_warnings,
-                    continue_migration,
-                })
+                .set(MigrationSettings { continue_migration })
                 .expect("MIGRATION_SETTINGS was set too early");
 
             match migrate(paths).await {
@@ -120,7 +112,6 @@ impl Termination for CliResult {
 
 #[derive(Debug)]
 struct MigrationSettings {
-    suppress_unhandled_warnings: bool,
     continue_migration: bool,
 }
 

@@ -1,5 +1,5 @@
 use crate::interface::{Interface, ParentKind};
-use crate::MIGRATION_SETTINGS;
+
 use regex::Regex;
 use std::collections::HashMap;
 use std::fs::{self, read_dir};
@@ -32,19 +32,13 @@ pub fn read_xml_file(path: PathBuf) -> Result<InterfacesResult, anyhow::Error> {
         warning: None,
     };
     if !unhandled_fields.is_empty() {
-        if !MIGRATION_SETTINGS
-            .get()
-            .unwrap()
-            .suppress_unhandled_warnings
-        {
-            for unused_str in unhandled_fields {
-                let split_str = unused_str.split_once('.').unwrap();
-                log::warn!(
-                    "Unhandled field in interface {}: {}",
-                    result.interfaces[split_str.0.parse::<usize>().unwrap()].name,
-                    split_str.1
-                );
-            }
+        for unused_str in unhandled_fields {
+            let split_str = unused_str.split_once('.').unwrap();
+            log::warn!(
+                "Unhandled field in interface {}: {}",
+                result.interfaces[split_str.0.parse::<usize>().unwrap()].name,
+                split_str.1
+            );
         }
         result.warning = Some(anyhow::anyhow!("Unhandled fields"))
     }

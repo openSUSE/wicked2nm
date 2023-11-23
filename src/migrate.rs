@@ -26,10 +26,8 @@ impl Adapter for WickedAdapter {
         for interface in interfaces.interfaces {
             let connection_result = interface.to_connection()?;
             if !connection_result.warnings.is_empty() {
-                if !settings.suppress_unhandled_warnings {
-                    for connection_error in &connection_result.warnings {
-                        log::warn!("{}", connection_error);
-                    }
+                for connection_error in &connection_result.warnings {
+                    log::warn!("{}", connection_error);
                 }
                 if !settings.continue_migration {
                     return Err(anyhow::anyhow!(
