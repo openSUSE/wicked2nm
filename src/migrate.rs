@@ -15,8 +15,9 @@ impl WickedAdapter {
 impl Adapter for WickedAdapter {
     fn read(&self) -> Result<model::NetworkState, Box<dyn std::error::Error>> {
         let interfaces = wicked_read(self.paths.clone())?;
+        let settings = MIGRATION_SETTINGS.get().unwrap();
 
-        if !MIGRATION_SETTINGS.get().unwrap().continue_migration && interfaces.warning.is_some() {
+        if !settings.continue_migration && interfaces.warning.is_some() {
             return Err(interfaces.warning.unwrap().into());
         }
 
@@ -25,17 +26,14 @@ impl Adapter for WickedAdapter {
         for interface in interfaces.interfaces {
             let connection_result = interface.to_connection()?;
             if !connection_result.warnings.is_empty()
-                && !MIGRATION_SETTINGS
-                    .get()
-                    .unwrap()
-                    .suppress_unhandled_warnings
+                && !settings.suppress_unhandled_warnings
             {
                 for connection_error in &connection_result.warnings {
                     log::warn!("{}", connection_error);
                 }
             }
             if !connection_result.warnings.is_empty()
-                && !MIGRATION_SETTINGS.get().unwrap().continue_migration
+                && !settings.continue_migration
             {
                 return Err(anyhow::anyhow!(
                     "Migration of {} failed",
