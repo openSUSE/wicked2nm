@@ -1,4 +1,5 @@
 use crate::bond::Bond;
+use crate::vlan::Vlan;
 use crate::MIGRATION_SETTINGS;
 use agama_dbus_server::network::model::{
     self, IpConfig, IpRoute, Ipv4Method, Ipv6Method, MacAddress,
@@ -29,6 +30,7 @@ pub struct Interface {
     pub bond: Option<Bond>,
     #[serde(rename = "@origin")]
     pub origin: String,
+    pub vlan: Option<Vlan>,
 }
 
 #[skip_serializing_none]
@@ -149,6 +151,9 @@ impl Interface {
         } else if let Some(bond) = &self.bond {
             connection.mac_address = MacAddress::try_from(&bond.address)?;
             connection.config = bond.into()
+        } else if let Some(vlan) = &self.vlan {
+            connection.mac_address = MacAddress::try_from(&vlan.address)?;
+            connection.config = vlan.into()
         }
 
         Ok(ConnectionResult {

@@ -2,6 +2,7 @@ mod bond;
 mod interface;
 mod migrate;
 mod reader;
+mod vlan;
 
 use clap::builder::TypedValueParser;
 use clap::{Args, Parser, Subcommand};
