@@ -24,6 +24,8 @@ pub struct Interface {
     pub ipv6_dhcp: Option<Ipv6Dhcp>,
     #[serde(rename = "ipv6-auto", skip_serializing_if = "Option::is_none")]
     pub ipv6_auto: Option<Ipv6Auto>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dummy: Option<Dummy>,
     #[serde(rename = "@origin")]
     pub origin: String,
 }
@@ -110,6 +112,12 @@ pub struct Ipv6Auto {
     pub update: Vec<String>,
 }
 
+#[skip_serializing_none]
+#[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
+pub struct Dummy {
+    pub address: Option<String>,
+}
+
 #[derive(Debug, PartialEq, SerializeDisplay, DeserializeFromStr, EnumString, Display)]
 #[strum(serialize_all = "kebab_case")]
 pub enum FailOverMac {
@@ -152,8 +160,14 @@ impl Interface {
             ..Default::default()
         };
 
+        let connection = if self.dummy.is_some() {
+            model::Connection::Dummy(model::DummyConnection { base })
+        } else {
+            model::Connection::Ethernet(model::EthernetConnection { base })
+        };
+
         Ok(ConnectionResult {
-            connection: model::Connection::Ethernet(model::EthernetConnection { base }),
+            connection,
             warnings: ip_config.warnings,
         })
     }
