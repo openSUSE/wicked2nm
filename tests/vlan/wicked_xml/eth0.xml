@@ -1,0 +1,22 @@
+<interface origin="compat:suse:/etc/sysconfig/network/ifcfg-eth0">
+  <name>eth0</name>
+  <control>
+    <mode>boot</mode>
+  </control>
+  <firewall/>
+  <link/>
+  <ipv4>
+    <enabled>true</enabled>
+    <arp-verify>true</arp-verify>
+  </ipv4>
+  <ipv4:static>
+    <address>
+      <local>192.168.100.5/24</local>
+    </address>
+  </ipv4:static>
+  <ipv6>
+    <enabled>true</enabled>
+    <privacy>prefer-public</privacy>
+    <accept-redirects>false</accept-redirects>
+  </ipv6>
+</interface>
