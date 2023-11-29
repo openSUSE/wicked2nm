@@ -8,6 +8,7 @@ MIGRATE_WICKED_BIN=../target/debug/migrate-wicked
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 cd $SCRIPT_DIR
 TEST_DIRS=${TEST_DIRS:-$(ls -d */ | sed 's#/##')}
+NO_CLEANUP=${NO_CLEANUP:-0}
 
 error_msg() {
     echo -e "${RED}Error for test $1: $2${NC}"
@@ -59,16 +60,16 @@ for test_dir in ${TEST_DIRS}; do
     elif [ $? -ne 0 ] && [ "$expect_fail" = true ]; then
         echo -e "${GREEN}Migration for $test_dir failed as expected${NC}"
     fi
-    for cmp_file in $(ls $test_dir/system-connections/); do
-        diff --unified=0 --color=always -I uuid $test_dir/system-connections/$cmp_file /etc/NetworkManager/system-connections/${cmp_file/\./\*.}
+    for cmp_file in $(ls -1 $test_dir/system-connections/); do
+        diff --unified=0 --color=always -I uuid $test_dir/system-connections/$cmp_file /etc/NetworkManager/system-connections/${cmp_file}
         if [ $? -ne 0 ]; then
             error_msg ${test_dir} "$cmp_file didn't match"
             RESULT=1
         else
-            echo -e "${GREEN}Migration for connection ${cmp_file/\.*/} successful${NC}"
+            echo -e "${GREEN}Migration for connection ${cmp_file/\.nmconnection/} successful${NC}"
         fi
     done
-    nm_cleanup
+    [ "$NO_CLEANUP" -gt 0 ] || nm_cleanup
 done
 
 if [ $RESULT -eq 0 ]; then
