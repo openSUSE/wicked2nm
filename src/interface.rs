@@ -1,4 +1,6 @@
-use agama_dbus_server::network::model::{self, IpConfig, IpRoute, Ipv4Method, Ipv6Method};
+use agama_dbus_server::network::model::{
+    self, IpConfig, IpRoute, Ipv4Method, Ipv6Method, MacAddress,
+};
 use cidr::IpInet;
 use serde::{Deserialize, Serialize};
 use serde_with::{
@@ -153,12 +155,18 @@ pub struct IpConfigResult {
 impl Interface {
     pub fn to_connection(&self) -> Result<ConnectionResult, anyhow::Error> {
         let ip_config = self.to_ip_config()?;
-        let base = model::BaseConnection {
+        let mut base = model::BaseConnection {
             id: self.name.clone(),
             interface: self.name.clone(),
             ip_config: ip_config.ip_config,
             ..Default::default()
         };
+
+        if let Some(dummy) = &self.dummy {
+            if let Some(address) = &dummy.address {
+                base.mac_address = MacAddress::from_str(address)?;
+            }
+        }
 
         let connection = if self.dummy.is_some() {
             model::Connection::Dummy(model::DummyConnection { base })
