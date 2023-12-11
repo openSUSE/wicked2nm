@@ -3,19 +3,13 @@ use agama_dbus_server::network::model::{
 };
 use cidr::IpInet;
 use serde::{Deserialize, Serialize};
-use serde_with::{
-    formats::CommaSeparator, serde_as, skip_serializing_none, DeserializeFromStr, SerializeDisplay,
-    StringWithSeparator,
-};
+use serde_with::{serde_as, skip_serializing_none};
 use std::{net::IpAddr, str::FromStr};
-use strum_macros::{Display, EnumString};
 
 #[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Interface {
     pub name: String,
-    pub control: Control,
-    pub firewall: Firewall,
     pub ipv4: Ipv4,
     #[serde(rename = "ipv4-static", skip_serializing_if = "Option::is_none")]
     pub ipv4_static: Option<Ipv4Static>,
@@ -34,29 +28,14 @@ pub struct Interface {
 
 #[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
 #[serde(default)]
-pub struct Control {
-    pub mode: String,
-}
-
-#[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
-#[serde(default)]
-pub struct Firewall {}
-
-#[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
-#[serde(default)]
 pub struct Ipv4 {
     pub enabled: bool,
-    #[serde(rename = "arp-verify")]
-    pub arp_verify: bool,
 }
 
 #[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Ipv6 {
     pub enabled: bool,
-    pub privacy: String,
-    #[serde(rename = "accept-redir")]
-    pub accept_redirects: bool,
 }
 
 #[skip_serializing_none]
@@ -88,44 +67,19 @@ pub struct Address {
 #[serde(default)]
 pub struct Ipv6Dhcp {
     pub enabled: bool,
-    pub flags: String,
-    #[serde_as(as = "StringWithSeparator::<CommaSeparator, String>")]
-    pub update: Vec<String>,
     pub mode: String,
-    #[serde(rename = "rapid-commit")]
-    pub rapid_commit: String,
-    pub hostname: String,
-    #[serde(rename = "defer-timeout")]
-    pub defer_timeout: u32,
-    #[serde(rename = "recover-lease")]
-    pub recover_lease: bool,
-    #[serde(rename = "refresh-lease")]
-    pub refresh_lease: bool,
-    #[serde(rename = "release-lease")]
-    pub release_lease: bool,
 }
 
-#[serde_as]
 #[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Ipv6Auto {
     pub enabled: bool,
-    #[serde_as(as = "StringWithSeparator::<CommaSeparator, String>")]
-    pub update: Vec<String>,
 }
 
 #[skip_serializing_none]
 #[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
 pub struct Dummy {
     pub address: Option<String>,
-}
-
-#[derive(Debug, PartialEq, SerializeDisplay, DeserializeFromStr, EnumString, Display)]
-#[strum(serialize_all = "kebab_case")]
-pub enum FailOverMac {
-    None,
-    Active,
-    Follow,
 }
 
 #[skip_serializing_none]
@@ -312,10 +266,7 @@ mod tests {
     #[test]
     fn test_static_interface_to_connection() {
         let static_interface = Interface {
-            ipv4: Ipv4 {
-                enabled: true,
-                ..Default::default()
-            },
+            ipv4: Ipv4 { enabled: true },
             ipv4_static: Some(Ipv4Static {
                 addresses: Some(vec![Address {
                     local: "127.0.0.1/8".to_string(),
@@ -327,10 +278,7 @@ mod tests {
                     ..Default::default()
                 }]),
             }),
-            ipv6: Ipv6 {
-                enabled: true,
-                ..Default::default()
-            },
+            ipv6: Ipv6 { enabled: true },
             ipv6_static: Some(Ipv6Static {
                 addresses: Some(vec![Address {
                     local: "::1/128".to_string(),
@@ -422,14 +370,8 @@ mod tests {
     #[test]
     fn test_dhcp_interface_to_connection() {
         let static_interface = Interface {
-            ipv4: Ipv4 {
-                enabled: true,
-                ..Default::default()
-            },
-            ipv6: Ipv6 {
-                enabled: true,
-                ..Default::default()
-            },
+            ipv4: Ipv4 { enabled: true },
+            ipv6: Ipv6 { enabled: true },
             ..Default::default()
         };
 
