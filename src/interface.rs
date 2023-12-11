@@ -439,4 +439,21 @@ mod tests {
         assert_eq!(static_connection.base().ip_config.method6, Ipv6Method::Auto);
         assert_eq!(static_connection.base().ip_config.addresses.len(), 0);
     }
+
+    #[test]
+    fn test_dummy_interface_to_connection() {
+        let dummy_interface = Interface {
+            dummy: Some(Dummy {
+                address: Some("12:34:56:78:9A:BC".to_string()),
+            }),
+            ..Default::default()
+        };
+
+        let connection: model::Connection = dummy_interface.to_connection().unwrap().connection;
+        assert!(matches!(connection, model::Connection::Dummy(_)));
+        assert_eq!(
+            connection.base().mac_address.to_string(),
+            "12:34:56:78:9A:BC"
+        );
+    }
 }
