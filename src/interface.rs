@@ -1,3 +1,4 @@
+use crate::MIGRATION_SETTINGS;
 use agama_dbus_server::network::model::{
     self, IpConfig, IpRoute, Ipv4Method, Ipv6Method, MacAddress,
 };
@@ -113,8 +114,15 @@ impl Interface {
             id: self.name.clone(),
             interface: Some(self.name.clone()),
             ip_config: ip_config.ip_config,
+            status: model::Status::Down,
             ..Default::default()
         };
+
+        if let Some(settings) = MIGRATION_SETTINGS.get() {
+            if settings.activate_connections {
+                base.status = model::Status::Up;
+            }
+        }
 
         if let Some(dummy) = &self.dummy {
             if let Some(address) = &dummy.address {

@@ -49,6 +49,10 @@ pub enum Commands {
         /// Run migration without sending connections to NetworkManager (can be run without NetworkManager installed)
         #[arg(long, global = true)]
         dry_run: bool,
+
+        /// Activate connections immediately
+        #[arg(long, global = true)]
+        activate_connections: bool,
     },
 }
 
@@ -69,6 +73,7 @@ async fn run_command(cli: Cli) -> anyhow::Result<()> {
                 .set(MigrationSettings {
                     continue_migration: true,
                     dry_run: false,
+                    activate_connections: true,
                 })
                 .expect("MIGRATION_SETTINGS was set too early");
 
@@ -89,11 +94,13 @@ async fn run_command(cli: Cli) -> anyhow::Result<()> {
             paths,
             continue_migration,
             dry_run,
+            activate_connections,
         } => {
             MIGRATION_SETTINGS
                 .set(MigrationSettings {
                     continue_migration,
                     dry_run,
+                    activate_connections,
                 })
                 .expect("MIGRATION_SETTINGS was set too early");
 
@@ -123,6 +130,7 @@ impl Termination for CliResult {
 struct MigrationSettings {
     continue_migration: bool,
     dry_run: bool,
+    activate_connections: bool,
 }
 
 static MIGRATION_SETTINGS: OnceCell<MigrationSettings> = OnceCell::const_new();
