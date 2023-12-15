@@ -45,6 +45,10 @@ pub enum Commands {
         /// Continue migration if warnings are encountered
         #[arg(short, long, global = true)]
         continue_migration: bool,
+
+        /// Run migration without sending connections to NetworkManager (can be run without NetworkManager installed)
+        #[arg(long, global = true)]
+        dry_run: bool,
     },
 }
 
@@ -64,6 +68,7 @@ async fn run_command(cli: Cli) -> anyhow::Result<()> {
             MIGRATION_SETTINGS
                 .set(MigrationSettings {
                     continue_migration: true,
+                    dry_run: false,
                 })
                 .expect("MIGRATION_SETTINGS was set too early");
 
@@ -83,9 +88,13 @@ async fn run_command(cli: Cli) -> anyhow::Result<()> {
         Commands::Migrate {
             paths,
             continue_migration,
+            dry_run,
         } => {
             MIGRATION_SETTINGS
-                .set(MigrationSettings { continue_migration })
+                .set(MigrationSettings {
+                    continue_migration,
+                    dry_run,
+                })
                 .expect("MIGRATION_SETTINGS was set too early");
 
             match migrate(paths).await {
@@ -113,6 +122,7 @@ impl Termination for CliResult {
 #[derive(Debug)]
 struct MigrationSettings {
     continue_migration: bool,
+    dry_run: bool,
 }
 
 static MIGRATION_SETTINGS: OnceCell<MigrationSettings> = OnceCell::const_new();

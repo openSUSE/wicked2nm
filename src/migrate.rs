@@ -50,6 +50,13 @@ impl Adapter for WickedAdapter {
 pub async fn migrate(paths: Vec<String>) -> Result<(), Box<dyn Error>> {
     let wicked = WickedAdapter::new(paths);
     let state = wicked.read()?;
+    let settings = MIGRATION_SETTINGS.get().unwrap();
+    if settings.dry_run {
+        for connection in state.connections {
+            log::debug!("{:#?}", connection);
+        }
+        return Ok(());
+    }
     let nm = NetworkManagerAdapter::from_system().await?;
     nm.write(&state)?;
     Ok(())
