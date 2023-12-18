@@ -23,6 +23,8 @@ pub struct Interface {
     pub ipv6_auto: Option<Ipv6Auto>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dummy: Option<Dummy>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ethernet: Option<Ethernet>,
     #[serde(rename = "@origin")]
     pub origin: String,
 }
@@ -92,6 +94,12 @@ pub struct Route {
     pub priority: Option<u32>,
 }
 
+#[skip_serializing_none]
+#[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
+pub struct Ethernet {
+    pub address: Option<String>,
+}
+
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Nexthop {
     pub gateway: String,
@@ -126,6 +134,10 @@ impl Interface {
 
         if let Some(dummy) = &self.dummy {
             if let Some(address) = &dummy.address {
+                base.mac_address = MacAddress::from_str(address)?;
+            }
+        } else if let Some(ethernet) = &self.ethernet {
+            if let Some(address) = &ethernet.address {
                 base.mac_address = MacAddress::from_str(address)?;
             }
         }
