@@ -32,7 +32,7 @@ impl Adapter for WickedAdapter {
                 if !settings.continue_migration {
                     return Err(anyhow::anyhow!(
                         "Migration of {} failed",
-                        connection_result.connection.id()
+                        connection_result.connection.id
                     )
                     .into());
                 }

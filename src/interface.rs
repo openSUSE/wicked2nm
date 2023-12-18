@@ -118,7 +118,7 @@ pub struct IpConfigResult {
 impl Interface {
     pub fn to_connection(&self) -> Result<ConnectionResult, anyhow::Error> {
         let ip_config = self.to_ip_config()?;
-        let mut base = model::BaseConnection {
+        let mut connection = model::Connection {
             id: self.name.clone(),
             interface: Some(self.name.clone()),
             ip_config: ip_config.ip_config,
@@ -128,24 +128,24 @@ impl Interface {
 
         if let Some(settings) = MIGRATION_SETTINGS.get() {
             if settings.activate_connections {
-                base.status = model::Status::Up;
+                connection.status = model::Status::Up;
             }
         }
 
         if let Some(dummy) = &self.dummy {
             if let Some(address) = &dummy.address {
-                base.mac_address = MacAddress::from_str(address)?;
+                connection.mac_address = MacAddress::from_str(address)?;
             }
         } else if let Some(ethernet) = &self.ethernet {
             if let Some(address) = &ethernet.address {
-                base.mac_address = MacAddress::from_str(address)?;
+                connection.mac_address = MacAddress::from_str(address)?;
             }
         }
 
-        let connection = if self.dummy.is_some() {
-            model::Connection::Dummy(model::DummyConnection { base })
+        if self.dummy.is_some() {
+            connection.config = model::ConnectionConfig::Dummy
         } else {
-            model::Connection::Ethernet(model::EthernetConnection { base })
+            connection.config = model::ConnectionConfig::Ethernet
         };
 
         Ok(ConnectionResult {
@@ -315,71 +315,44 @@ mod tests {
 
         let static_connection: model::Connection =
             static_interface.to_connection().unwrap().connection;
+        assert_eq!(static_connection.ip_config.method4, Ipv4Method::Manual);
         assert_eq!(
-            static_connection.base().ip_config.method4,
-            Ipv4Method::Manual
-        );
-        assert_eq!(
-            static_connection.base().ip_config.addresses[0].to_string(),
+            static_connection.ip_config.addresses[0].to_string(),
             "127.0.0.1/8"
         );
+        assert_eq!(static_connection.ip_config.method6, Ipv6Method::Manual);
+        assert_eq!(static_connection.ip_config.addresses[1].to_string(), "::1");
         assert_eq!(
-            static_connection.base().ip_config.method6,
-            Ipv6Method::Manual
-        );
-        assert_eq!(
-            static_connection.base().ip_config.addresses[1].to_string(),
-            "::1"
-        );
-        assert_eq!(
-            static_connection.base().ip_config.addresses[1]
+            static_connection.ip_config.addresses[1]
                 .network_length()
                 .to_string(),
             "128"
         );
-        assert!(static_connection.base().ip_config.routes4.is_some());
-        assert!(
-            static_connection
-                .base()
-                .ip_config
-                .routes4
-                .clone()
-                .unwrap()
-                .len()
-                == 1
-        );
+        assert!(static_connection.ip_config.routes4.is_some());
+        assert!(static_connection.ip_config.routes4.clone().unwrap().len() == 1);
         assert_eq!(
-            static_connection.base().ip_config.routes4.clone().unwrap()[0]
+            static_connection.ip_config.routes4.clone().unwrap()[0]
                 .destination
                 .to_string(),
             "0.0.0.0/0"
         );
         assert_eq!(
-            static_connection.base().ip_config.routes4.clone().unwrap()[0]
+            static_connection.ip_config.routes4.clone().unwrap()[0]
                 .next_hop
                 .unwrap()
                 .to_string(),
             "127.0.0.1"
         );
-        assert!(static_connection.base().ip_config.routes6.is_some());
-        assert!(
-            static_connection
-                .base()
-                .ip_config
-                .routes6
-                .clone()
-                .unwrap()
-                .len()
-                == 1
-        );
+        assert!(static_connection.ip_config.routes6.is_some());
+        assert!(static_connection.ip_config.routes6.clone().unwrap().len() == 1);
         assert_eq!(
-            static_connection.base().ip_config.routes6.clone().unwrap()[0]
+            static_connection.ip_config.routes6.clone().unwrap()[0]
                 .destination
                 .to_string(),
             "::/0"
         );
         assert_eq!(
-            static_connection.base().ip_config.routes6.clone().unwrap()[0]
+            static_connection.ip_config.routes6.clone().unwrap()[0]
                 .next_hop
                 .unwrap()
                 .to_string(),
@@ -397,9 +370,9 @@ mod tests {
 
         let static_connection: model::Connection =
             static_interface.to_connection().unwrap().connection;
-        assert_eq!(static_connection.base().ip_config.method4, Ipv4Method::Auto);
-        assert_eq!(static_connection.base().ip_config.method6, Ipv6Method::Auto);
-        assert_eq!(static_connection.base().ip_config.addresses.len(), 0);
+        assert_eq!(static_connection.ip_config.method4, Ipv4Method::Auto);
+        assert_eq!(static_connection.ip_config.method6, Ipv6Method::Auto);
+        assert_eq!(static_connection.ip_config.addresses.len(), 0);
     }
 
     #[test]
@@ -412,10 +385,7 @@ mod tests {
         };
 
         let connection: model::Connection = dummy_interface.to_connection().unwrap().connection;
-        assert!(matches!(connection, model::Connection::Dummy(_)));
-        assert_eq!(
-            connection.base().mac_address.to_string(),
-            "12:34:56:78:9A:BC"
-        );
+        assert!(matches!(connection.config, model::ConnectionConfig::Dummy));
+        assert_eq!(connection.mac_address.to_string(), "12:34:56:78:9A:BC");
     }
 }
