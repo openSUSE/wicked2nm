@@ -111,7 +111,7 @@ impl Interface {
         let ip_config = self.to_ip_config()?;
         let mut base = model::BaseConnection {
             id: self.name.clone(),
-            interface: self.name.clone(),
+            interface: Some(self.name.clone()),
             ip_config: ip_config.ip_config,
             ..Default::default()
         };
