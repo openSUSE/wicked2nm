@@ -1,6 +1,7 @@
 use crate::{reader::read as wicked_read, MIGRATION_SETTINGS};
 use agama_dbus_server::network::{model, Adapter, NetworkManagerAdapter, NetworkState};
-use std::error::Error;
+use std::{collections::HashMap, error::Error};
+use uuid::Uuid;
 
 struct WickedAdapter {
     paths: Vec<String>,
@@ -12,10 +13,40 @@ impl WickedAdapter {
     }
 }
 
+fn update_parent_connection(
+    state: &mut model::NetworkState,
+    parents: HashMap<String, String>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let settings = MIGRATION_SETTINGS.get().unwrap();
+    let mut parent_uuid: HashMap<String, Uuid> = HashMap::new();
+
+    for (id, parent) in parents {
+        if let Some(parent_con) = state.get_connection_by_interface(&parent) {
+            parent_uuid.insert(id, parent_con.uuid);
+        } else {
+            log::warn!("Missing parent {} connection for {}", parent, id);
+            if !settings.continue_migration {
+                return Err(anyhow::anyhow!("Migration of {} failed", id).into());
+            }
+        }
+    }
+
+    for (id, uuid) in parent_uuid {
+        if let Some(connection) = state.get_connection_mut(&id) {
+            connection.controller = Some(uuid);
+        } else {
+            return Err(anyhow::anyhow!("Unexpected failure - missing connection {}", id).into());
+        }
+    }
+
+    Ok(())
+}
+
 impl Adapter for WickedAdapter {
     fn read(&self) -> Result<model::NetworkState, Box<dyn std::error::Error>> {
         let interfaces = wicked_read(self.paths.clone())?;
         let settings = MIGRATION_SETTINGS.get().unwrap();
+        let mut parents: HashMap<String, String> = HashMap::new();
 
         if !settings.continue_migration && interfaces.warning.is_some() {
             return Err(interfaces.warning.unwrap().into());
@@ -37,8 +68,15 @@ impl Adapter for WickedAdapter {
                     .into());
                 }
             }
+
+            if let Some(parent) = interface.link.master {
+                parents.insert(connection_result.connection.id.clone(), parent.clone());
+            }
             state.add_connection(connection_result.connection)?;
         }
+
+        update_parent_connection(&mut state, parents)?;
+
         Ok(state)
     }
 
