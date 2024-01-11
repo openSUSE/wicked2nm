@@ -1,5 +1,6 @@
 use crate::{reader::read as wicked_read, MIGRATION_SETTINGS};
 use agama_dbus_server::network::{model, Adapter, NetworkManagerAdapter, NetworkState};
+use async_trait::async_trait;
 use std::{collections::HashMap, error::Error};
 use uuid::Uuid;
 
@@ -42,8 +43,9 @@ fn update_parent_connection(
     Ok(())
 }
 
+#[async_trait]
 impl Adapter for WickedAdapter {
-    fn read(&self) -> Result<model::NetworkState, Box<dyn std::error::Error>> {
+    async fn read(&self) -> Result<model::NetworkState, Box<dyn std::error::Error>> {
         let interfaces = wicked_read(self.paths.clone())?;
         let settings = MIGRATION_SETTINGS.get().unwrap();
         let mut parents: HashMap<String, String> = HashMap::new();
@@ -80,14 +82,17 @@ impl Adapter for WickedAdapter {
         Ok(state)
     }
 
-    fn write(&self, _network: &model::NetworkState) -> Result<(), Box<dyn std::error::Error>> {
+    async fn write(
+        &self,
+        _network: &model::NetworkState,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         unimplemented!("not needed");
     }
 }
 
 pub async fn migrate(paths: Vec<String>) -> Result<(), Box<dyn Error>> {
     let wicked = WickedAdapter::new(paths);
-    let state = wicked.read()?;
+    let state = wicked.read().await?;
     let settings = MIGRATION_SETTINGS.get().unwrap();
     if settings.dry_run {
         for connection in state.connections {
@@ -96,6 +101,6 @@ pub async fn migrate(paths: Vec<String>) -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
     let nm = NetworkManagerAdapter::from_system().await?;
-    nm.write(&state)?;
+    nm.write(&state).await?;
     Ok(())
 }
