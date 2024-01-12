@@ -192,7 +192,7 @@ mod tests {
                     validate_targets: Some(ArpValidateTargets::Any),
                     targets: vec![String::from("1.2.3.4"), String::from("4.3.2.1")]
                 }),
-                address: String::from("02:11:22:33:44:55"),
+                address: Some(String::from("02:11:22:33:44:55")),
             }
         );
     }
