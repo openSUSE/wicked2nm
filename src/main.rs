@@ -104,6 +104,11 @@ async fn run_command(cli: Cli) -> anyhow::Result<()> {
                 })
                 .expect("MIGRATION_SETTINGS was set too early");
 
+            log::debug!(
+                "Running migration with MigrationSettings: {:#?}",
+                MIGRATION_SETTINGS.get().unwrap()
+            );
+
             match migrate(paths).await {
                 Ok(()) => Ok(()),
                 Err(e) => Err(anyhow::anyhow!("Migration failed: {:?}", e)),
