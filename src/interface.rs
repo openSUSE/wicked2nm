@@ -9,34 +9,32 @@ use serde_with::{serde_as, skip_serializing_none, DeserializeFromStr, SerializeD
 use std::{collections::HashMap, net::IpAddr, str::FromStr};
 use strum_macros::{Display, EnumString};
 
+#[skip_serializing_none]
 #[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Interface {
     pub name: String,
     pub link: Link,
     pub ipv4: Ipv4,
-    #[serde(rename = "ipv4-static", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "ipv4-static")]
     pub ipv4_static: Option<Ipv4Static>,
     pub ipv6: Ipv6,
-    #[serde(rename = "ipv6-static", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "ipv6-static")]
     pub ipv6_static: Option<Ipv6Static>,
-    #[serde(rename = "ipv6-dhcp", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "ipv6-dhcp")]
     pub ipv6_dhcp: Option<Ipv6Dhcp>,
-    #[serde(rename = "ipv6-auto", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "ipv6-auto")]
     pub ipv6_auto: Option<Ipv6Auto>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub dummy: Option<Dummy>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub ethernet: Option<Ethernet>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub bond: Option<Bond>,
     #[serde(rename = "@origin")]
     pub origin: String,
 }
 
+#[skip_serializing_none]
 #[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
 #[serde(default)]
-#[skip_serializing_none]
 pub struct Link {
     pub master: Option<String>,
 }
@@ -164,8 +162,8 @@ pub enum WickedBondMode {
     BalanceAlb,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
 #[skip_serializing_none]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Bond {
     pub mode: WickedBondMode,
@@ -218,10 +216,10 @@ impl Bond {
     }
 }
 
+#[skip_serializing_none]
 #[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
 pub struct Slave {
     pub device: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub primary: Option<bool>,
 }
 
@@ -261,11 +259,12 @@ pub enum ArpValidate {
     FilterBackup = 6,
 }
 
+#[skip_serializing_none]
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct ArpMon {
     pub interval: u32,
     pub validate: ArpValidate,
-    #[serde(rename = "validate-targets", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "validate-targets")]
     pub validate_targets: Option<ArpValidateTargets>,
     #[serde(deserialize_with = "unwrap_arpmon_targets")]
     pub targets: Vec<String>,
