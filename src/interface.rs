@@ -93,8 +93,7 @@ pub struct Ipv6Auto {
 
 #[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
 pub struct Dummy {
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub address: String,
+    pub address: Option<String>,
 }
 
 #[skip_serializing_none]
@@ -205,8 +204,7 @@ pub struct Bond {
     /* only on mode=[balance_tlb|balance_alb|balance_RR|active-backup] */
     pub resend_igmp: Option<u32>,
     pub all_slaves_active: Option<bool>,
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub address: String,
+    pub address: Option<String>,
 }
 
 impl Bond {
@@ -425,8 +423,7 @@ impl From<&Bond> for model::ConnectionConfig {
 #[skip_serializing_none]
 #[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
 pub struct Ethernet {
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub address: String,
+    pub address: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -462,13 +459,13 @@ impl Interface {
         }
 
         if let Some(ethernet) = &self.ethernet {
-            connection.mac_address = MacAddress::from_str(&ethernet.address)?;
+            connection.mac_address = MacAddress::try_from(&ethernet.address)?;
             connection.config = model::ConnectionConfig::Ethernet
         } else if let Some(dummy) = &self.dummy {
-            connection.mac_address = MacAddress::from_str(&dummy.address)?;
+            connection.mac_address = MacAddress::try_from(&dummy.address)?;
             connection.config = model::ConnectionConfig::Dummy
         } else if let Some(bond) = &self.bond {
-            connection.mac_address = MacAddress::from_str(&bond.address)?;
+            connection.mac_address = MacAddress::try_from(&bond.address)?;
             connection.config = bond.into()
         }
 
@@ -703,7 +700,7 @@ mod tests {
     fn test_dummy_interface_to_connection() {
         let dummy_interface = Interface {
             dummy: Some(Dummy {
-                address: "12:34:56:78:9A:BC".to_string(),
+                address: Some("12:34:56:78:9A:BC".to_string()),
             }),
             ..Default::default()
         };
@@ -721,7 +718,7 @@ mod tests {
 
         let connection: model::Connection = dummy_interface.to_connection().unwrap().connection;
         assert!(matches!(connection.config, model::ConnectionConfig::Dummy));
-        assert_eq!(dummy_interface.dummy.unwrap().address, String::from(""));
+        assert_eq!(dummy_interface.dummy.unwrap().address, None);
         assert!(matches!(connection.mac_address, MacAddress::Unset));
     }
 
@@ -759,7 +756,7 @@ mod tests {
                     targets: vec![String::from("1.2.3.4"), String::from("4.3.2.1")],
                 }),
                 slaves: vec![],
-                address: String::from("02:11:22:33:44:55"),
+                address: Some(String::from("02:11:22:33:44:55")),
             }),
             ..Default::default()
         };
