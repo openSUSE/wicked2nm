@@ -14,7 +14,7 @@ agama-lib = { path="../agama-lib" }
 regex = "1.9.5"
 agama-dbus-server = { path="../agama-dbus-server" }
 cidr = { version = "0.2.2", features = ["serde"] }
-clap = { version = "4.1.4", features = ["derive", "wrap_help"] }
+clap = { version = "4.1.4", features = ["derive", "wrap_help", "env"] }
 anyhow = "1.0.71"
 log = "0.4"
 simplelog = "0.12.1"

@@ -43,15 +43,15 @@ pub enum Commands {
         paths: Vec<String>,
 
         /// Continue migration if warnings are encountered
-        #[arg(short, long, global = true)]
+        #[arg(short, long, global = true, env = "MIGRATE_WICKED_CONTINUE_MIGRATION")]
         continue_migration: bool,
 
         /// Run migration without sending connections to NetworkManager (can be run without NetworkManager installed)
-        #[arg(long, global = true)]
+        #[arg(long, global = true, env = "MIGRATE_WICKED_DRY_RUN")]
         dry_run: bool,
 
         /// Activate connections immediately
-        #[arg(long, global = true)]
+        #[arg(long, global = true, env = "MIGRATE_WICKED_ACTIVATE_CONNECTIONS")]
         activate_connections: bool,
     },
 }
