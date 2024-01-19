@@ -1,3 +1,4 @@
+mod bond;
 mod interface;
 mod migrate;
 mod reader;

@@ -102,6 +102,7 @@ pub fn read(paths: Vec<String>) -> Result<InterfacesResult, anyhow::Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::bond::*;
     use crate::interface::*;
 
     #[test]
