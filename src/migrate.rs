@@ -1,3 +1,4 @@
+use crate::bridge::BridgePort;
 use crate::{reader::read as wicked_read, MIGRATION_SETTINGS};
 use agama_dbus_server::network::{model, Adapter, NetworkManagerAdapter, NetworkState};
 use async_trait::async_trait;
@@ -43,12 +44,42 @@ fn update_parent_connection(
     Ok(())
 }
 
+fn update_bridge_ports(
+    state: &mut model::NetworkState,
+    portconfigs: HashMap<String, BridgePort>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let settings = MIGRATION_SETTINGS.get().unwrap();
+
+    for (ifc, portconfig) in portconfigs {
+        let id;
+        if let Some(c) = state.get_connection_by_interface(&ifc) {
+            id = c.id.clone();
+        } else {
+            log::warn!("Missing bridge port {} connection", ifc);
+            if !settings.continue_migration {
+                return Err(anyhow::anyhow!(
+                    "Migration failed, because bridge is missing port {}",
+                    ifc
+                )
+                .into());
+            }
+            continue;
+        }
+
+        let c = state.get_connection_mut(&id).unwrap();
+        c.port_config = (&portconfig).into();
+    }
+
+    Ok(())
+}
+
 #[async_trait]
 impl Adapter for WickedAdapter {
     async fn read(&self) -> Result<model::NetworkState, Box<dyn std::error::Error>> {
         let interfaces = wicked_read(self.paths.clone())?;
         let settings = MIGRATION_SETTINGS.get().unwrap();
         let mut parents: HashMap<String, String> = HashMap::new();
+        let mut bridge_ports: HashMap<String, BridgePort> = HashMap::new();
 
         if !settings.continue_migration && interfaces.warning.is_some() {
             return Err(interfaces.warning.unwrap().into());
@@ -74,10 +105,16 @@ impl Adapter for WickedAdapter {
             if let Some(parent) = interface.link.master {
                 parents.insert(connection_result.connection.id.clone(), parent.clone());
             }
+            if let Some(bridge) = interface.bridge {
+                for port in bridge.ports {
+                    bridge_ports.insert(port.device.clone(), port.clone());
+                }
+            }
             state.add_connection(connection_result.connection)?;
         }
 
         update_parent_connection(&mut state, parents)?;
+        update_bridge_ports(&mut state, bridge_ports)?;
 
         Ok(state)
     }

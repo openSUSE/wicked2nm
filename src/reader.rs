@@ -198,6 +198,29 @@ mod tests {
         );
     }
 
+    /// This test check that the default for stp from wicked is False.
+    #[test]
+    fn test_bridge_default_stp() {
+        let xml = r##"
+            <interface>
+              <name>br0</name>
+              <bridge>
+                <ports>
+                  <port>
+                    <device>en0</device>
+                  </port>
+                </ports>
+              </bridge>
+            </interface>
+            "##;
+        let ifc = quick_xml::de::from_str::<Vec<Interface>>(replace_colons(xml).as_str())
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert!(ifc.bridge.is_some());
+        assert!(!ifc.bridge.unwrap().stp);
+    }
+
     #[test]
     fn test_broken_xml() {
         let xml = r##"
