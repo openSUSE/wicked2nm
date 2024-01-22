@@ -286,8 +286,18 @@ impl TryFrom<&Route> for IpRoute {
 mod tests {
     use super::*;
 
+    #[allow(dead_code)]
+    fn setup_default_migration_settings() {
+        let _ = MIGRATION_SETTINGS.set(crate::MigrationSettings {
+            continue_migration: false,
+            dry_run: false,
+            activate_connections: true,
+        });
+    }
+
     #[test]
     fn test_static_interface_to_connection() {
+        setup_default_migration_settings();
         let static_interface = Interface {
             ipv4: Ipv4 { enabled: true },
             ipv4_static: Some(Ipv4Static {
@@ -365,6 +375,7 @@ mod tests {
 
     #[test]
     fn test_dhcp_interface_to_connection() {
+        setup_default_migration_settings();
         let static_interface = Interface {
             ipv4: Ipv4 { enabled: true },
             ipv6: Ipv6 { enabled: true },
@@ -376,5 +387,32 @@ mod tests {
         assert_eq!(static_connection.ip_config.method4, Ipv4Method::Auto);
         assert_eq!(static_connection.ip_config.method6, Ipv6Method::Auto);
         assert_eq!(static_connection.ip_config.addresses.len(), 0);
+    }
+
+    #[test]
+    fn test_dummy_interface_to_connection() {
+        setup_default_migration_settings();
+        let dummy_interface = Interface {
+            dummy: Some(Dummy {
+                address: Some("12:34:56:78:9A:BC".to_string()),
+            }),
+            ..Default::default()
+        };
+
+        let connection: model::Connection = dummy_interface.to_connection().unwrap().connection;
+        assert!(matches!(connection.config, model::ConnectionConfig::Dummy));
+        assert_eq!(connection.mac_address.to_string(), "12:34:56:78:9A:BC");
+
+        let dummy_interface = Interface {
+            dummy: Some(Dummy {
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        let connection: model::Connection = dummy_interface.to_connection().unwrap().connection;
+        assert!(matches!(connection.config, model::ConnectionConfig::Dummy));
+        assert_eq!(dummy_interface.dummy.unwrap().address, None);
+        assert!(matches!(connection.mac_address, MacAddress::Unset));
     }
 }

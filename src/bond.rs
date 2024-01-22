@@ -325,36 +325,20 @@ impl From<&Bond> for model::ConnectionConfig {
 mod tests {
     use super::*;
     use crate::interface::*;
-    use agama_dbus_server::network::model::MacAddress;
+    use crate::MIGRATION_SETTINGS;
 
-    #[test]
-    fn test_dummy_interface_to_connection() {
-        let dummy_interface = Interface {
-            dummy: Some(Dummy {
-                address: Some("12:34:56:78:9A:BC".to_string()),
-            }),
-            ..Default::default()
-        };
-
-        let connection: model::Connection = dummy_interface.to_connection().unwrap().connection;
-        assert!(matches!(connection.config, model::ConnectionConfig::Dummy));
-        assert_eq!(connection.mac_address.to_string(), "12:34:56:78:9A:BC");
-
-        let dummy_interface = Interface {
-            dummy: Some(Dummy {
-                ..Default::default()
-            }),
-            ..Default::default()
-        };
-
-        let connection: model::Connection = dummy_interface.to_connection().unwrap().connection;
-        assert!(matches!(connection.config, model::ConnectionConfig::Dummy));
-        assert_eq!(dummy_interface.dummy.unwrap().address, None);
-        assert!(matches!(connection.mac_address, MacAddress::Unset));
+    #[allow(dead_code)]
+    fn setup_default_migration_settings() {
+        let _ = MIGRATION_SETTINGS.set(crate::MigrationSettings {
+            continue_migration: false,
+            dry_run: false,
+            activate_connections: true,
+        });
     }
 
     #[test]
     fn test_bond_options() {
+        setup_default_migration_settings();
         let bond_interface = Interface {
             bond: Some(Bond {
                 mode: WickedBondMode::IEEE8023ad,
