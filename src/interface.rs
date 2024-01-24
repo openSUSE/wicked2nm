@@ -1,6 +1,7 @@
 use crate::bond::Bond;
 use crate::bridge::Bridge;
 use crate::vlan::Vlan;
+use crate::wireless::Wireless;
 use crate::MIGRATION_SETTINGS;
 use agama_dbus_server::network::model::{
     self, IpConfig, IpRoute, Ipv4Method, Ipv6Method, MacAddress,
@@ -29,6 +30,8 @@ pub struct Interface {
     pub dummy: Option<Dummy>,
     pub ethernet: Option<Ethernet>,
     pub bond: Option<Bond>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub wireless: Option<Wireless>,
     #[serde(rename = "@origin")]
     pub origin: String,
     pub vlan: Option<Vlan>,
@@ -164,6 +167,20 @@ impl Interface {
             connection.mac_address = MacAddress::try_from(&bridge.address)?;
             connection.config = bridge.into();
             connections.push(connection);
+        } else if let Some(wireless) = &self.wireless {
+            if let Some(networks) = &wireless.networks {
+                if networks.len() > 1 {
+                    log::info!("{} has multiple networks defined, these will be split into different connections in NM", connection.id);
+                }
+                for (i, network) in networks.iter().enumerate() {
+                    let mut wireless_connection = connection.clone();
+                    if networks.len() > 1 {
+                        wireless_connection.id.push_str(&format!("-{}", i));
+                    }
+                    wireless_connection.config = network.try_into()?;
+                    connections.push(wireless_connection);
+                }
+            }
         } else {
             connections.push(connection);
         }

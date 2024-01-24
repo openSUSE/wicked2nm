@@ -4,6 +4,7 @@ mod interface;
 mod migrate;
 mod reader;
 mod vlan;
+mod wireless;
 
 use clap::builder::TypedValueParser;
 use clap::{Args, Parser, Subcommand};
