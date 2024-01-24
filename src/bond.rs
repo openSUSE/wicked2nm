@@ -376,14 +376,15 @@ mod tests {
             ..Default::default()
         };
 
-        let connection: model::Connection = bond_interface.to_connection().unwrap().connection;
+        let connection: &model::Connection =
+            &bond_interface.to_connection().unwrap().connections[0];
         assert!(matches!(
             connection.config,
             model::ConnectionConfig::Bond(_)
         ));
         assert_eq!(connection.mac_address.to_string(), "02:11:22:33:44:55");
 
-        if let model::ConnectionConfig::Bond(bond) = connection.config {
+        if let model::ConnectionConfig::Bond(bond) = &connection.config {
             assert_eq!(bond.mode, AgamaBondMode::LACP);
             let s = HashMap::from([
                 ("xmit_hash_policy", String::from("encap34")),

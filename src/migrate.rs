@@ -96,21 +96,23 @@ impl Adapter for WickedAdapter {
                 if !settings.continue_migration {
                     return Err(anyhow::anyhow!(
                         "Migration of {} failed",
-                        connection_result.connection.id
+                        connection_result.connections[0].id
                     )
                     .into());
                 }
             }
 
-            if let Some(parent) = interface.link.master {
-                parents.insert(connection_result.connection.id.clone(), parent.clone());
-            }
-            if let Some(bridge) = interface.bridge {
-                for port in bridge.ports {
-                    bridge_ports.insert(port.device.clone(), port.clone());
+            for connection in connection_result.connections {
+                if let Some(parent) = &interface.link.master {
+                    parents.insert(connection.id.clone(), parent.clone());
+                }
+                state.add_connection(connection)?;
+                if let Some(bridge) = &interface.bridge {
+                    for port in &bridge.ports {
+                        bridge_ports.insert(port.device.clone(), port.clone());
+                    }
                 }
             }
-            state.add_connection(connection_result.connection)?;
         }
 
         update_parent_connection(&mut state, parents)?;

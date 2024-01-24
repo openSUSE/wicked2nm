@@ -118,7 +118,7 @@ pub struct Nexthop {
 }
 
 pub struct ConnectionResult {
-    pub connection: model::Connection,
+    pub connections: Vec<model::Connection>,
     pub warnings: Vec<anyhow::Error>,
 }
 
@@ -129,6 +129,7 @@ pub struct IpConfigResult {
 
 impl Interface {
     pub fn to_connection(&self) -> Result<ConnectionResult, anyhow::Error> {
+        let settings = MIGRATION_SETTINGS.get().unwrap();
         let ip_config = self.to_ip_config()?;
         let mut connection = model::Connection {
             id: self.name.clone(),
@@ -137,32 +138,38 @@ impl Interface {
             status: model::Status::Down,
             ..Default::default()
         };
+        let mut connections: Vec<model::Connection> = vec![];
 
-        if let Some(settings) = MIGRATION_SETTINGS.get() {
-            if settings.activate_connections {
-                connection.status = model::Status::Up;
-            }
+        if settings.activate_connections {
+            connection.status = model::Status::Up;
         }
 
         if let Some(ethernet) = &self.ethernet {
             connection.mac_address = MacAddress::try_from(&ethernet.address)?;
-            connection.config = model::ConnectionConfig::Ethernet
+            connection.config = model::ConnectionConfig::Ethernet;
+            connections.push(connection);
         } else if let Some(dummy) = &self.dummy {
             connection.mac_address = MacAddress::try_from(&dummy.address)?;
-            connection.config = model::ConnectionConfig::Dummy
+            connection.config = model::ConnectionConfig::Dummy;
+            connections.push(connection);
         } else if let Some(bond) = &self.bond {
             connection.mac_address = MacAddress::try_from(&bond.address)?;
-            connection.config = bond.into()
+            connection.config = bond.into();
+            connections.push(connection);
         } else if let Some(vlan) = &self.vlan {
             connection.mac_address = MacAddress::try_from(&vlan.address)?;
-            connection.config = vlan.into()
+            connection.config = vlan.into();
+            connections.push(connection);
         } else if let Some(bridge) = &self.bridge {
             connection.mac_address = MacAddress::try_from(&bridge.address)?;
             connection.config = bridge.into();
+            connections.push(connection);
+        } else {
+            connections.push(connection);
         }
 
         Ok(ConnectionResult {
-            connection,
+            connections,
             warnings: ip_config.warnings,
         })
     }
@@ -337,7 +344,7 @@ mod tests {
         };
 
         let static_connection: model::Connection =
-            static_interface.to_connection().unwrap().connection;
+            static_interface.to_connection().unwrap().connections[0].to_owned();
         assert_eq!(static_connection.ip_config.method4, Ipv4Method::Manual);
         assert_eq!(
             static_connection.ip_config.addresses[0].to_string(),
@@ -393,7 +400,7 @@ mod tests {
         };
 
         let static_connection: model::Connection =
-            static_interface.to_connection().unwrap().connection;
+            static_interface.to_connection().unwrap().connections[0].to_owned();
         assert_eq!(static_connection.ip_config.method4, Ipv4Method::Auto);
         assert_eq!(static_connection.ip_config.method6, Ipv6Method::Auto);
         assert_eq!(static_connection.ip_config.addresses.len(), 0);
@@ -409,7 +416,8 @@ mod tests {
             ..Default::default()
         };
 
-        let connection: model::Connection = dummy_interface.to_connection().unwrap().connection;
+        let connection: &model::Connection =
+            &dummy_interface.to_connection().unwrap().connections[0];
         assert!(matches!(connection.config, model::ConnectionConfig::Dummy));
         assert_eq!(connection.mac_address.to_string(), "12:34:56:78:9A:BC");
 
@@ -420,7 +428,8 @@ mod tests {
             ..Default::default()
         };
 
-        let connection: model::Connection = dummy_interface.to_connection().unwrap().connection;
+        let connection: &model::Connection =
+            &dummy_interface.to_connection().unwrap().connections[0];
         assert!(matches!(connection.config, model::ConnectionConfig::Dummy));
         assert_eq!(dummy_interface.dummy.unwrap().address, None);
         assert!(matches!(connection.mac_address, MacAddress::Unset));

@@ -84,9 +84,9 @@ mod tests {
         let ifc = vlan_interface.to_connection();
 
         assert!(ifc.is_ok());
-        let ifc = ifc.unwrap().connection;
+        let ifc = &ifc.unwrap().connections[0];
         assert!(matches!(ifc.config, model::ConnectionConfig::Vlan(_)));
-        if let model::ConnectionConfig::Vlan(v) = ifc.config {
+        if let model::ConnectionConfig::Vlan(v) = &ifc.config {
             assert_eq!(v.id, 10);
             assert_eq!(v.protocol, model::VlanProtocol::IEEE802_1ad);
             assert_eq!(v.parent, "en0");
