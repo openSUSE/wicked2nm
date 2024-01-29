@@ -5,6 +5,7 @@ type=wifi
 interface-name=wlan0
 
 [wifi]
+hidden=true
 mode=adhoc
 ssid=example_ssid2
 

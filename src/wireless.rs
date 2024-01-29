@@ -25,8 +25,8 @@ pub struct Wireless {
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Network {
     pub essid: String,
-    // #[serde(rename = "scan-ssid")]
-    // pub scan_ssid: bool,
+    #[serde(rename = "scan-ssid")]
+    pub scan_ssid: bool,
     pub mode: WickedWirelessMode,
     #[serde(rename = "wpa-psk")]
     pub wpa_psk: Option<WpaPsk>,
@@ -114,6 +114,7 @@ impl TryFrom<&Network> for model::ConnectionConfig {
         let settings = MIGRATION_SETTINGS.get().unwrap();
         let mut config = model::WirelessConfig {
             ssid: SSID(network.essid.as_bytes().to_vec()),
+            hidden: network.scan_ssid,
             ..Default::default()
         };
 
@@ -195,6 +196,7 @@ mod tests {
                 networks: Some(vec![Network {
                     channel: Some(0),
                     essid: "testssid".to_string(),
+                    scan_ssid: false,
                     mode: WickedWirelessMode::AP,
                     wpa_psk: None,
                     key_management: vec!["wpa-psk".to_string()],
@@ -237,6 +239,7 @@ mod tests {
             wireless: Some(Wireless {
                 networks: Some(vec![Network {
                     essid: "testssid".to_string(),
+                    scan_ssid: true,
                     mode: WickedWirelessMode::Infrastructure,
                     wpa_psk: Some(WpaPsk {
                         passphrase: "testpassword".to_string(),
@@ -261,6 +264,7 @@ mod tests {
             panic!()
         };
         assert_eq!(wireless.ssid, SSID("testssid".as_bytes().to_vec()));
+        assert!(wireless.hidden);
         assert_eq!(wireless.mode, model::WirelessMode::Infra);
         assert_eq!(wireless.password, Some("testpassword".to_string()));
         assert_eq!(wireless.security, model::SecurityProtocol::WPA2);

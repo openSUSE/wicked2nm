@@ -8,6 +8,7 @@ interface-name=wlan0
 band=a
 bssid=12:34:56:78:9A:BC
 channel=100
+hidden=true
 mode=adhoc
 ssid=example_ssid
 

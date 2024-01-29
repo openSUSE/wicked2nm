@@ -54,7 +54,7 @@
     <networks>
       <network>
         <essid>test</essid>
-        <scan-ssid>true</scan-ssid>
+        <scan-ssid>false</scan-ssid>
         <mode>infrastructure</mode>
         <access-point>12:34:56:78:9a:bc</access-point>
         <key-management>none</key-management>
