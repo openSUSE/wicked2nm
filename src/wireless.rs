@@ -171,3 +171,112 @@ impl TryFrom<&Network> for model::ConnectionConfig {
         Ok(model::ConnectionConfig::Wireless(config))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::interface::*;
+    use crate::MIGRATION_SETTINGS;
+
+    #[allow(dead_code)]
+    fn setup_default_migration_settings() {
+        let _ = MIGRATION_SETTINGS.set(crate::MigrationSettings {
+            continue_migration: false,
+            dry_run: false,
+            activate_connections: true,
+        });
+    }
+
+    #[test]
+    fn test_wireless_bands() {
+        setup_default_migration_settings();
+        let mut wireless_interface = Interface {
+            wireless: Some(Wireless {
+                networks: Some(vec![Network {
+                    channel: Some(0),
+                    essid: "testssid".to_string(),
+                    mode: WickedWirelessMode::AP,
+                    wpa_psk: None,
+                    key_management: vec!["wpa-psk".to_string()],
+                    access_point: None,
+                    wep: None,
+                }]),
+                ap_scan: 0,
+            }),
+            ..Default::default()
+        };
+        let connections = wireless_interface.to_connection();
+        assert!(connections.is_ok());
+        let connection = &connections.unwrap().connections[0];
+        let model::ConnectionConfig::Wireless(wireless) = &connection.config else {
+            panic!()
+        };
+        assert_eq!(wireless.band, Some("bg".try_into().unwrap()));
+
+        wireless_interface
+            .wireless
+            .as_mut()
+            .unwrap()
+            .networks
+            .as_mut()
+            .unwrap()[0]
+            .channel = Some(32);
+        let ifc = wireless_interface.to_connection();
+        assert!(ifc.is_ok());
+        let ifc = &ifc.unwrap().connections[0];
+        let model::ConnectionConfig::Wireless(wireless) = &ifc.config else {
+            panic!()
+        };
+        assert_eq!(wireless.band, Some("a".try_into().unwrap()));
+    }
+
+    #[test]
+    fn test_wireless_migration() {
+        setup_default_migration_settings();
+        let wireless_interface = Interface {
+            wireless: Some(Wireless {
+                networks: Some(vec![Network {
+                    essid: "testssid".to_string(),
+                    mode: WickedWirelessMode::Infrastructure,
+                    wpa_psk: Some(WpaPsk {
+                        passphrase: "testpassword".to_string(),
+                    }),
+                    key_management: vec!["wpa-psk".to_string()],
+                    channel: Some(14),
+                    access_point: Some("12:34:56:78:9A:BC".to_string()),
+                    wep: Some(Wep {
+                        auth_algo: "open".to_string(),
+                        default_key: 1,
+                        key: vec!["01020304ff".to_string(), "s:hello".to_string()],
+                    }),
+                }]),
+                ap_scan: 0,
+            }),
+            ..Default::default()
+        };
+        let connections = wireless_interface.to_connection();
+        assert!(connections.is_ok());
+        let connection = &connections.unwrap().connections[0];
+        let model::ConnectionConfig::Wireless(wireless) = &connection.config else {
+            panic!()
+        };
+        assert_eq!(wireless.ssid, SSID("testssid".as_bytes().to_vec()));
+        assert_eq!(wireless.mode, model::WirelessMode::Infra);
+        assert_eq!(wireless.password, Some("testpassword".to_string()));
+        assert_eq!(wireless.security, model::SecurityProtocol::WPA2);
+        assert_eq!(
+            wireless.bssid,
+            Some(MacAddr6::from_str("12:34:56:78:9A:BC").unwrap())
+        );
+        assert_eq!(
+            wireless.wep_security,
+            Some(WEPSecurity {
+                auth_alg: WEPAuthAlg::Open,
+                wep_key_type: WEPKeyType::Key,
+                keys: vec!["01020304ff".to_string(), "hello".to_string()],
+                wep_key_index: 1,
+            })
+        );
+        assert_eq!(wireless.band, Some("bg".try_into().unwrap()));
+    }
+}
