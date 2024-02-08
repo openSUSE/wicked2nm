@@ -1,5 +1,6 @@
 use crate::bond::Bond;
 use crate::bridge::Bridge;
+use crate::infiniband::{Infiniband, InfinibandChild};
 use crate::vlan::Vlan;
 use crate::wireless::Wireless;
 use crate::MIGRATION_SETTINGS;
@@ -34,6 +35,9 @@ pub struct Interface {
     pub origin: String,
     pub vlan: Option<Vlan>,
     pub bridge: Option<Bridge>,
+    pub infiniband: Option<Infiniband>,
+    #[serde(rename = "infiniband-child")]
+    pub infiniband_child: Option<InfinibandChild>,
 }
 
 #[skip_serializing_none]
@@ -132,6 +136,7 @@ impl Interface {
     pub fn to_connection(&self) -> Result<ConnectionResult, anyhow::Error> {
         let settings = MIGRATION_SETTINGS.get().unwrap();
         let ip_config = self.to_ip_config()?;
+        let mut warnings = ip_config.warnings;
         let mut connection = model::Connection {
             id: self.name.clone(),
             interface: Some(self.name.clone()),
@@ -179,13 +184,29 @@ impl Interface {
                     connections.push(wireless_connection);
                 }
             }
+        } else if let Some(infiniband) = &self.infiniband {
+            if infiniband.multicast.is_some() {
+                warnings.push(anyhow::anyhow!(
+                    "Infiniband multicast isn't supported by NetworkManager"
+                ));
+            }
+            connection.config = infiniband.into();
+            connections.push(connection)
+        } else if let Some(infiniband_child) = &self.infiniband_child {
+            if infiniband_child.multicast.is_some() {
+                warnings.push(anyhow::anyhow!(
+                    "Infiniband multicast isn't supported by NetworkManager"
+                ));
+            }
+            connection.config = infiniband_child.into();
+            connections.push(connection)
         } else {
             connections.push(connection);
         }
 
         Ok(ConnectionResult {
             connections,
-            warnings: ip_config.warnings,
+            warnings,
         })
     }
 

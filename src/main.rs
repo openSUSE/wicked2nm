@@ -1,5 +1,6 @@
 mod bond;
 mod bridge;
+mod infiniband;
 mod interface;
 mod migrate;
 mod reader;
