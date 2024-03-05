@@ -19,12 +19,9 @@ if [[ $(ls -A /etc/NetworkManager/system-connections/) ]]; then
     exit 1
 fi
 
-nm_connections="$(nmcli connection  | tail -n +2 | awk '{print $1}')";
 nm_cleanup() {
-    for i in $(nmcli connection  | tail -n +2 | awk '{print $1}'); do
-        if ! printf '%s\0' "${nm_connections[@]}" | grep -qwz $i; then
-            nmcli connection delete "$i"
-        fi
+    for con in $(ls /etc/NetworkManager/system-connections/ | sed 's/\.nmconnection//'); do
+        nmcli con delete $con
     done
 }
 
@@ -36,23 +33,28 @@ fi
 for test_dir in ${TEST_DIRS}; do
     echo -e "${BOLD}Testing ${test_dir}${NC}"
 
+    migrate_args=""
+    show_args=""
+
     if [[ $test_dir == *"failure" ]]; then
         expect_fail=true
     else
         expect_fail=false
+        migrate_args+=" -c"
     fi
 
-    $MIGRATE_WICKED_BIN show $test_dir/wicked_xml
+    if [ -d $test_dir/netconfig ]; then
+        migrate_args+=" --netconfig-path $test_dir/netconfig/config"
+        show_args+=" --netconfig-path $test_dir/netconfig/config"
+    fi
+
+    $MIGRATE_WICKED_BIN show $show_args $test_dir/wicked_xml
     if [ $? -ne 0 ] && [ "$expect_fail" = false ]; then
         error_msg ${test_dir} "show failed"
         FAILED_TESTS+=("${test_dir}::show")
     fi
 
-    if [ "$expect_fail" = true ]; then
-        $MIGRATE_WICKED_BIN migrate $test_dir/wicked_xml
-    else
-        $MIGRATE_WICKED_BIN migrate -c $test_dir/wicked_xml
-    fi
+    $MIGRATE_WICKED_BIN migrate $migrate_args $test_dir/wicked_xml
     if [ $? -ne 0 ] && [ "$expect_fail" = false ]; then
         error_msg ${test_dir} "migration failed"
         FAILED_TESTS+=("${test_dir}::migrate")
@@ -60,8 +62,9 @@ for test_dir in ${TEST_DIRS}; do
     elif [ $? -ne 0 ] && [ "$expect_fail" = true ]; then
         echo -e "${GREEN}Migration for $test_dir failed as expected${NC}"
     fi
+
     for cmp_file in $(ls -1 $test_dir/system-connections/); do
-        diff --unified=0 --color=always -I uuid $test_dir/system-connections/$cmp_file /etc/NetworkManager/system-connections/${cmp_file}
+        diff --unified=0 --color=always -I uuid -I timestamp $test_dir/system-connections/$cmp_file /etc/NetworkManager/system-connections/${cmp_file}
         if [ $? -ne 0 ]; then
             error_msg ${test_dir} "$cmp_file didn't match"
             FAILED_TESTS+=("${test_dir}::compare_config::${cmp_file}")

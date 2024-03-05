@@ -1,4 +1,6 @@
 use crate::interface::Interface;
+use crate::netconfig::{read_netconfig, Netconfig};
+use crate::MIGRATION_SETTINGS;
 
 use regex::Regex;
 use std::fs::{self, read_dir};
@@ -6,6 +8,7 @@ use std::path::{Path, PathBuf};
 
 pub struct InterfacesResult {
     pub interfaces: Vec<Interface>,
+    pub netconfig: Option<Netconfig>,
     pub warning: Option<anyhow::Error>,
 }
 
@@ -28,6 +31,7 @@ pub fn read_xml_file(path: PathBuf) -> Result<InterfacesResult, anyhow::Error> {
     })?;
     let mut result = InterfacesResult {
         interfaces,
+        netconfig: None,
         warning: None,
     };
     if !unhandled_fields.is_empty() {
@@ -73,10 +77,23 @@ fn recurse_files(path: impl AsRef<Path>) -> std::io::Result<Vec<PathBuf>> {
 }
 
 pub fn read(paths: Vec<String>) -> Result<InterfacesResult, anyhow::Error> {
+    let settings = MIGRATION_SETTINGS.get().unwrap();
     let mut result = InterfacesResult {
         interfaces: vec![],
+        netconfig: None,
         warning: None,
     };
+
+    match read_netconfig(settings.netconfig_path.clone()) {
+        Ok(netconfig) => result.netconfig = netconfig,
+        Err(e) => {
+            if !settings.continue_migration {
+                return Err(e);
+            };
+            log::warn!("Failed to read netconfig: {}", e);
+        }
+    };
+
     for path in paths {
         let path: PathBuf = path.into();
         if path.is_dir() {

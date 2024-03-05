@@ -1,6 +1,6 @@
 use crate::bridge::BridgePort;
 use crate::{reader::read as wicked_read, MIGRATION_SETTINGS};
-use agama_server::network::model::{Connection, GeneralState};
+use agama_server::network::model::{Connection, GeneralState, StateConfig};
 use agama_server::network::{Adapter, NetworkManagerAdapter, NetworkState};
 use std::{collections::HashMap, error::Error};
 use uuid::Uuid;
@@ -128,6 +128,28 @@ pub async fn migrate(paths: Vec<String>) -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
     let nm = NetworkManagerAdapter::from_system().await?;
+
+    if let Some(netconfig) = interfaces.netconfig {
+        let current_state = nm.read(StateConfig::default()).await?;
+        let mut loopback = current_state.get_connection("lo").unwrap().clone();
+        loopback.ip_config.nameservers = match netconfig.static_dns_servers() {
+            Ok(nameservers) => nameservers,
+            Err(e) => {
+                let error = anyhow::anyhow!("Error when parsing static DNS servers: {}", e);
+                if !settings.continue_migration {
+                    return Err(error.into());
+                } else {
+                    log::warn!("{}", error);
+                    vec![]
+                }
+            }
+        };
+        if let Some(static_dns_searchlist) = netconfig.static_dns_searchlist {
+            loopback.ip_config.dns_searchlist = static_dns_searchlist;
+        }
+        state.add_connection(loopback)?;
+    }
+
     nm.write(&state).await?;
     Ok(())
 }

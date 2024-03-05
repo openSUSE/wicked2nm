@@ -3,6 +3,7 @@ mod bridge;
 mod infiniband;
 mod interface;
 mod migrate;
+mod netconfig;
 mod reader;
 mod tuntap;
 mod vlan;
@@ -13,8 +14,12 @@ use clap::{Args, Parser, Subcommand};
 use log::*;
 use migrate::migrate;
 use reader::read as wicked_read;
+use serde::Serialize;
 use std::process::{ExitCode, Termination};
 use tokio::sync::OnceCell;
+
+use crate::interface::Interface;
+use crate::netconfig::Netconfig;
 
 #[derive(Parser)]
 #[command(name = "migrate-wicked", version(concat!(env!("CARGO_PKG_VERSION"),"~",env!("GIT_HEAD"))), about, long_about = None)]
@@ -30,6 +35,9 @@ struct Cli {
 struct GlobalOpts {
     #[arg(long, global = true, default_value_t = LevelFilter::Warn, value_parser = clap::builder::PossibleValuesParser::new(["TRACE", "DEBUG", "INFO", "WARN", "ERROR"]).map(|s| s.parse::<LevelFilter>().unwrap()),)]
     pub log_level: LevelFilter,
+
+    #[arg(long, global = true, default_value_t = String::from("/etc/sysconfig/network/config"), env = "MIGRATE_WICKED_NETCONFIG_PATH")]
+    pub netconfig_path: String,
 }
 
 #[derive(Subcommand)]
@@ -80,18 +88,28 @@ async fn run_command(cli: Cli) -> anyhow::Result<()> {
                     continue_migration: true,
                     dry_run: false,
                     activate_connections: true,
+                    netconfig_path: cli.global_opts.netconfig_path,
                 })
                 .expect("MIGRATION_SETTINGS was set too early");
 
             let interfaces_result = wicked_read(paths)?;
-            let output: String = match format {
-                Format::Json => serde_json::to_string(&interfaces_result.interfaces)?,
-                Format::PrettyJson => serde_json::to_string_pretty(&interfaces_result.interfaces)?,
-                Format::Yaml => serde_yaml::to_string(&interfaces_result.interfaces)?,
-                Format::Xml => {
-                    quick_xml::se::to_string_with_root("interface", &interfaces_result.interfaces)?
-                }
-                Format::Text => format!("{:?}", interfaces_result.interfaces),
+
+            #[derive(Debug, Serialize)]
+            struct WickedConfig {
+                interface: Vec<Interface>,
+                netconfig: Option<Netconfig>,
+            }
+            let show_output = WickedConfig {
+                interface: interfaces_result.interfaces,
+                netconfig: interfaces_result.netconfig,
+            };
+
+            let output = match format {
+                Format::Json => serde_json::to_string(&show_output)?,
+                Format::PrettyJson => serde_json::to_string_pretty(&show_output)?,
+                Format::Yaml => serde_yaml::to_string(&show_output)?,
+                Format::Xml => quick_xml::se::to_string_with_root("wicked-config", &show_output)?,
+                Format::Text => format!("{:?}", show_output),
             };
             println!("{}", output);
             Ok(())
@@ -107,6 +125,7 @@ async fn run_command(cli: Cli) -> anyhow::Result<()> {
                     continue_migration,
                     dry_run,
                     activate_connections,
+                    netconfig_path: cli.global_opts.netconfig_path,
                 })
                 .expect("MIGRATION_SETTINGS was set too early");
 
@@ -142,6 +161,18 @@ struct MigrationSettings {
     continue_migration: bool,
     dry_run: bool,
     activate_connections: bool,
+    netconfig_path: String,
+}
+
+impl Default for MigrationSettings {
+    fn default() -> Self {
+        MigrationSettings {
+            continue_migration: false,
+            dry_run: false,
+            activate_connections: true,
+            netconfig_path: "".to_string(),
+        }
+    }
 }
 
 static MIGRATION_SETTINGS: OnceCell<MigrationSettings> = OnceCell::const_new();

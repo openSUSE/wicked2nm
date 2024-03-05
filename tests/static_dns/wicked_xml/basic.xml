@@ -1,0 +1,14 @@
+<interface origin="compat:suse:/etc/sysconfig/network/ifcfg-eth0">
+  <name>eth0</name>
+  <control>
+    <mode>boot</mode>
+  </control>
+  <firewall/>
+  <link/>
+  <ipv4>
+    <enabled>false</enabled>
+  </ipv4>
+  <ipv6>
+    <enabled>false</enabled>
+  </ipv6>
+</interface>
