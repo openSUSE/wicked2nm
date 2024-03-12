@@ -1,7 +1,9 @@
 use crate::bridge::BridgePort;
 use crate::{reader::read as wicked_read, MIGRATION_SETTINGS};
-use agama_server::network::model::{Connection, GeneralState, StateConfig};
-use agama_server::network::{Adapter, NetworkManagerAdapter, NetworkState};
+use agama_server::network::model::{MatchConfig, IpConfig, Connection, GeneralState, StateConfig};
+use agama_server::network::{Adapter, NetworkManagerAdapter, NetworkState, model};
+use cidr::IpInet;
+use std::str::FromStr;
 use std::{collections::HashMap, error::Error};
 use uuid::Uuid;
 
@@ -74,6 +76,25 @@ fn update_bridge_ports(
     Ok(())
 }
 
+fn create_lo_connection() -> Connection {
+    Connection {
+        id: "lo".to_string(),
+        ip_config: IpConfig {
+            method4: model::Ipv4Method::Manual,
+            method6: model::Ipv6Method::Manual,
+            addresses: vec![
+                IpInet::from_str("127.0.0.1/8").unwrap(),
+                IpInet::from_str("::1/128").unwrap(),
+            ],
+            ..Default::default()
+        },
+        interface: Some("lo".to_string()),
+        match_config: MatchConfig::default(),
+        config: model::ConnectionConfig::Loopback,
+        ..Default::default()
+    }
+}
+
 pub async fn migrate(paths: Vec<String>) -> Result<(), Box<dyn Error>> {
     let interfaces = wicked_read(paths.clone())?;
     let settings = MIGRATION_SETTINGS.get().unwrap();
@@ -131,7 +152,10 @@ pub async fn migrate(paths: Vec<String>) -> Result<(), Box<dyn Error>> {
 
     if let Some(netconfig) = interfaces.netconfig {
         let current_state = nm.read(StateConfig::default()).await?;
-        let mut loopback = current_state.get_connection("lo").unwrap().clone();
+        let mut loopback = match current_state.get_connection("lo") {
+            Some(lo) => lo.clone(),
+            None => create_lo_connection(),
+        };
         loopback.ip_config.nameservers = match netconfig.static_dns_servers() {
             Ok(nameservers) => nameservers,
             Err(e) => {
