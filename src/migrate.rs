@@ -1,7 +1,7 @@
 use crate::bridge::BridgePort;
 use crate::{reader::read as wicked_read, MIGRATION_SETTINGS};
-use agama_server::network::model::{MatchConfig, IpConfig, Connection, GeneralState, StateConfig};
-use agama_server::network::{Adapter, NetworkManagerAdapter, NetworkState, model};
+use agama_server::network::model::{Connection, GeneralState, IpConfig, MatchConfig, StateConfig};
+use agama_server::network::{model, Adapter, NetworkManagerAdapter, NetworkState};
 use cidr::IpInet;
 use std::str::FromStr;
 use std::{collections::HashMap, error::Error};

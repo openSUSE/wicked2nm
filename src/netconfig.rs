@@ -24,10 +24,13 @@ pub fn read_netconfig(path: impl AsRef<Path>) -> Result<Option<Netconfig>, anyho
     if let Err(e) = dotenv::from_filename(path) {
         return Err(e.into());
     };
+    handle_netconfig_values()
+}
+
+fn handle_netconfig_values() -> Result<Option<Netconfig>, anyhow::Error> {
     if let Ok(dns_policy) = dotenv::var("NETCONFIG_DNS_POLICY") {
         let dns_policies: Vec<&str> = dns_policy.split(' ').collect();
         if dns_policies.len() > 1 {
-            println!("{:?}", dns_policies);
             return Err(anyhow::anyhow!(
                 "For NETCONFIG_DNS_POLICY only single policies are supported"
             ));
@@ -66,4 +69,50 @@ pub fn read_netconfig(path: impl AsRef<Path>) -> Result<Option<Netconfig>, anyho
         }
     }
     Ok(Some(netconfig))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::env;
+
+    #[test]
+    fn test_handle_netconfig_values() {
+        env::set_var("NETCONFIG_DNS_POLICY", "STATIC_FALLBACK NetworkManager");
+        assert!(handle_netconfig_values().is_err());
+
+        env::set_var("NETCONFIG_DNS_POLICY", "STATIC_FALLBACK");
+        assert!(handle_netconfig_values().is_err());
+
+        env::set_var("NETCONFIG_DNS_POLICY", "");
+        env::set_var(
+            "NETCONFIG_DNS_STATIC_SERVERS",
+            "192.168.0.10 192.168.1.10 2001:db8::10",
+        );
+        env::set_var("NETCONFIG_DNS_STATIC_SEARCHLIST", "suse.com suse.de");
+        assert!(handle_netconfig_values().unwrap().is_none());
+
+        env::set_var("NETCONFIG_DNS_POLICY", "STATIC");
+        assert_eq!(
+            handle_netconfig_values().unwrap(),
+            Some(Netconfig {
+                static_dns_servers: Some(vec![
+                    "192.168.0.10".to_string(),
+                    "192.168.1.10".to_string(),
+                    "2001:db8::10".to_string()
+                ]),
+                static_dns_searchlist: Some(vec!["suse.com".to_string(), "suse.de".to_string()])
+            })
+        );
+
+        env::set_var("NETCONFIG_DNS_STATIC_SERVERS", "");
+        env::set_var("NETCONFIG_DNS_STATIC_SEARCHLIST", "");
+        assert_eq!(
+            handle_netconfig_values().unwrap(),
+            Some(Netconfig {
+                static_dns_servers: None,
+                static_dns_searchlist: None
+            })
+        );
+    }
 }
