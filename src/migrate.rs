@@ -171,6 +171,11 @@ pub async fn migrate(paths: Vec<String>) -> Result<(), Box<dyn Error>> {
         if let Some(static_dns_searchlist) = netconfig.static_dns_searchlist {
             loopback.ip_config.dns_searchlist = static_dns_searchlist;
         }
+
+        for con in state.connections.iter_mut() {
+            con.ip_config.ignore_auto_dns = true;
+        }
+
         state.add_connection(loopback)?;
     }
 
