@@ -1,0 +1,16 @@
+<interface origin="compat:suse:/etc/sysconfig/network/ifcfg-eth9">
+  <name>eth9</name>
+  <control>
+    <mode>boot</mode>
+  </control>
+  <firewall/>
+  <link>
+    <mtu>1500</mtu>
+  </link>
+  <ipv4>
+    <enabled>false</enabled>
+  </ipv4>
+  <ipv6>
+    <enabled>false</enabled>
+  </ipv6>
+</interface>

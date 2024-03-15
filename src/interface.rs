@@ -54,6 +54,7 @@ pub struct Firewall {
 #[serde(default)]
 pub struct Link {
     pub master: Option<String>,
+    pub mtu: Option<u32>,
 }
 
 #[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
@@ -152,6 +153,7 @@ impl Interface {
             interface: Some(self.name.clone()),
             ip_config: ip_config.ip_config,
             status: Status::Down,
+            mtu: self.link.mtu.unwrap_or_default(),
             ..Default::default()
         };
         let mut connections: Vec<model::Connection> = vec![];
