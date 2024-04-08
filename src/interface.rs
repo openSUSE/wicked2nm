@@ -3,7 +3,7 @@ use crate::bridge::Bridge;
 use crate::vlan::Vlan;
 use crate::wireless::Wireless;
 use crate::MIGRATION_SETTINGS;
-use agama_dbus_server::network::model::{
+use agama_server::network::model::{
     self, IpConfig, IpRoute, Ipv4Method, Ipv6Method, MacAddress,
 };
 use cidr::IpInet;

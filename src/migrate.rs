@@ -1,6 +1,6 @@
 use crate::bridge::BridgePort;
 use crate::{reader::read as wicked_read, MIGRATION_SETTINGS};
-use agama_dbus_server::network::{model, Adapter, NetworkManagerAdapter, NetworkState};
+use agama_server::network::{model, Adapter, NetworkManagerAdapter, NetworkState};
 use async_trait::async_trait;
 use std::{collections::HashMap, error::Error};
 use uuid::Uuid;

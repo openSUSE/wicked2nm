@@ -1,5 +1,5 @@
 use crate::MIGRATION_SETTINGS;
-use agama_dbus_server::network::model::{self, WEPAuthAlg, WEPKeyType, WEPSecurity};
+use agama_server::network::model::{self, WEPAuthAlg, WEPKeyType, WEPSecurity};
 use agama_lib::network::types::SSID;
 use anyhow::anyhow;
 use macaddr::MacAddr6;

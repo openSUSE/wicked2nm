@@ -1,4 +1,4 @@
-use agama_dbus_server::network::model;
+use agama_server::network::model;
 use serde::{Deserialize, Serialize};
 use serde_with::{skip_serializing_none, DeserializeFromStr, SerializeDisplay};
 use strum_macros::{Display, EnumString};

@@ -12,7 +12,7 @@ serde_yaml = "0.9.17"
 quick-xml = { version = "0.28.2", features = ["serialize"] }
 agama-lib = { path="../agama-lib" }
 regex = "1.9.5"
-agama-dbus-server = { path="../agama-dbus-server" }
+agama-server = { path="../agama-server" }
 cidr = { version = "0.2.2", features = ["serde"] }
 clap = { version = "4.1.4", features = ["derive", "wrap_help", "env"] }
 anyhow = "1.0.71"

@@ -1,4 +1,4 @@
-use agama_dbus_server::network::model;
+use agama_server::network::model;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_with::skip_serializing_none;
 
