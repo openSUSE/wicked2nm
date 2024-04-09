@@ -1743,7 +1743,6 @@ dependencies = [
  "agama-lib",
  "agama-server",
  "anyhow",
- "async-trait",
  "cidr",
  "clap",
  "log",
