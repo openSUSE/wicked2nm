@@ -15,6 +15,7 @@ use std::{net::IpAddr, str::FromStr};
 #[serde(default)]
 pub struct Interface {
     pub name: String,
+    pub firewall: Firewall,
     pub link: Link,
     pub ipv4: Ipv4,
     #[serde(rename = "ipv4-static")]
@@ -38,6 +39,13 @@ pub struct Interface {
     pub infiniband: Option<Infiniband>,
     #[serde(rename = "infiniband-child")]
     pub infiniband_child: Option<InfinibandChild>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Firewall {
+    pub zone: Option<String>,
 }
 
 #[skip_serializing_none]
@@ -139,6 +147,7 @@ impl Interface {
         let mut warnings = ip_config.warnings;
         let mut connection = model::Connection {
             id: self.name.clone(),
+            firewall_zone: self.firewall.zone.clone(),
             interface: Some(self.name.clone()),
             ip_config: ip_config.ip_config,
             status: model::Status::Down,
@@ -469,5 +478,19 @@ mod tests {
         assert!(matches!(connection.config, model::ConnectionConfig::Dummy));
         assert_eq!(dummy_interface.dummy.unwrap().address, None);
         assert!(matches!(connection.mac_address, MacAddress::Unset));
+    }
+
+    #[test]
+    fn test_firewall_zone_to_connection() {
+        setup_default_migration_settings();
+        let ifc = Interface {
+            firewall: Firewall {
+                zone: Some("topsecret".to_string()),
+            },
+            ..Default::default()
+        };
+
+        let con: model::Connection = ifc.to_connection().unwrap().connections[0].to_owned();
+        assert_eq!(con.firewall_zone, Some("topsecret".to_string()));
     }
 }

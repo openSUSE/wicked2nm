@@ -3,6 +3,7 @@ id=bond0
 uuid=766a5c05-2ba1-45be-960d-9f2dbf89b293
 type=bond
 interface-name=bond0
+zone=public
 
 [ethernet]
 cloned-mac-address=02:00:33:44:55:11

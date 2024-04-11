@@ -234,4 +234,22 @@ mod tests {
         let err = quick_xml::de::from_str::<Vec<Interface>>(replace_colons(xml).as_str());
         assert!(err.is_err());
     }
+
+    #[test]
+    fn test_xml_firewall_zone() {
+        let xml = r##"
+            <interface>
+                <name>eth1</name>
+                <firewall>
+                    <zone>foo</zone>
+                </firewall>
+            </interface>
+            "##;
+
+        let ifc = quick_xml::de::from_str::<Vec<Interface>>(replace_colons(xml).as_str())
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert_eq!(ifc.firewall.zone, Some("foo".to_string()));
+    }
 }

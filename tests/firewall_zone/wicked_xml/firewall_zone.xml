@@ -1,0 +1,10 @@
+<interface origin="compat:suse:/etc/sysconfig/network/ifcfg-eth1">
+  <name>eth1</name>
+  <control>
+    <mode>boot</mode>
+  </control>
+  <firewall>
+    <zone>topsecret</zone>
+  </firewall>
+  <link/>
+</interface>
