@@ -96,6 +96,10 @@ pub fn read(paths: Vec<String>) -> Result<InterfacesResult, anyhow::Error> {
             result.interfaces.append(&mut read_xml.interfaces);
         }
     }
+
+    // Filter loopback as it doesn't need to be migrated
+    result.interfaces.retain(|interface| interface.name != "lo");
+
     Ok(result)
 }
 
