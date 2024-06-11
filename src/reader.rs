@@ -84,15 +84,17 @@ pub fn read(paths: Vec<String>) -> Result<InterfacesResult, anyhow::Error> {
         warning: None,
     };
 
-    match read_netconfig(settings.netconfig_path.clone()) {
-        Ok(netconfig) => result.netconfig = netconfig,
-        Err(e) => {
-            if !settings.continue_migration {
-                return Err(e);
-            };
-            log::warn!("Failed to read netconfig: {}", e);
-        }
-    };
+    if !settings.without_netconfig {
+        match read_netconfig(settings.netconfig_path.clone()) {
+            Ok(netconfig) => result.netconfig = netconfig,
+            Err(e) => {
+                if !settings.continue_migration {
+                    return Err(e);
+                };
+                log::warn!("Failed to read netconfig: {}", e);
+            }
+        };
+    }
 
     for path in paths {
         let path: PathBuf = path.into();

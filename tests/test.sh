@@ -46,6 +46,9 @@ for test_dir in ${TEST_DIRS}; do
     if [ -d $test_dir/netconfig ]; then
         migrate_args+=" --netconfig-path $test_dir/netconfig/config"
         show_args+=" --netconfig-path $test_dir/netconfig/config"
+    else
+        migrate_args+=" --without-netconfig"
+        show_args+=" --without-netconfig"
     fi
 
     $MIGRATE_WICKED_BIN show $show_args $test_dir/wicked_xml

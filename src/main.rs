@@ -36,6 +36,9 @@ struct GlobalOpts {
     #[arg(long, global = true, default_value_t = LevelFilter::Warn, value_parser = clap::builder::PossibleValuesParser::new(["TRACE", "DEBUG", "INFO", "WARN", "ERROR"]).map(|s| s.parse::<LevelFilter>().unwrap()),)]
     pub log_level: LevelFilter,
 
+    #[arg(long, global = true, env = "MIGRATE_WICKED_WITHOUT_NETCONFIG")]
+    pub without_netconfig: bool,
+
     #[arg(long, global = true, default_value_t = String::from("/etc/sysconfig/network/config"), env = "MIGRATE_WICKED_NETCONFIG_PATH")]
     pub netconfig_path: String,
 }
@@ -88,6 +91,7 @@ async fn run_command(cli: Cli) -> anyhow::Result<()> {
                     continue_migration: true,
                     dry_run: false,
                     activate_connections: true,
+                    without_netconfig: cli.global_opts.without_netconfig,
                     netconfig_path: cli.global_opts.netconfig_path,
                 })
                 .expect("MIGRATION_SETTINGS was set too early");
@@ -125,6 +129,7 @@ async fn run_command(cli: Cli) -> anyhow::Result<()> {
                     continue_migration,
                     dry_run,
                     activate_connections,
+                    without_netconfig: cli.global_opts.without_netconfig,
                     netconfig_path: cli.global_opts.netconfig_path,
                 })
                 .expect("MIGRATION_SETTINGS was set too early");
@@ -161,6 +166,7 @@ struct MigrationSettings {
     continue_migration: bool,
     dry_run: bool,
     activate_connections: bool,
+    without_netconfig: bool,
     netconfig_path: String,
 }
 
@@ -170,6 +176,7 @@ impl Default for MigrationSettings {
             continue_migration: false,
             dry_run: false,
             activate_connections: true,
+            without_netconfig: false,
             netconfig_path: "".to_string(),
         }
     }

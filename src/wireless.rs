@@ -185,6 +185,7 @@ mod tests {
             continue_migration: false,
             dry_run: false,
             activate_connections: true,
+            without_netconfig: true,
             netconfig_path: "".to_string(),
         });
     }
