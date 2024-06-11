@@ -1,16 +1,16 @@
 [connection]
-id=eth1
+id=eth8
 uuid=4935f592-3e86-491b-847b-2ce4f180001c
 type=ethernet
-interface-name=eth1
+interface-name=eth8
 
 [ethernet]
-cloned-mac-address=12:34:56:78:9A:BC
 
 [match]
 
 [ipv4]
 address1=192.168.100.5/24
+address2=192.168.101.5/24
 method=manual
 
 [ipv6]

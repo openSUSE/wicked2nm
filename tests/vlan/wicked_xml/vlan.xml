@@ -1,11 +1,11 @@
-<interface origin="compat:suse:/etc/sysconfig/network/ifcfg-eth0.10">
-  <name>eth0.10</name>
+<interface origin="compat:suse:/etc/sysconfig/network/ifcfg-eth9.10">
+  <name>eth9.10</name>
   <control>
     <mode>boot</mode>
   </control>
   <firewall/>
   <vlan>
-    <device>eth0</device>
+    <device>eth9</device>
     <address>de:ea:dd:be:ee:ff</address>
     <protocol>ieee802-1Q</protocol>
     <tag>10</tag>

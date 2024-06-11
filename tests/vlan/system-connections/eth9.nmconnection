@@ -1,8 +1,8 @@
 [connection]
-id=eth0
+id=eth9
 uuid=413aa828-9cb9-4dfe-8b16-8774fbe2d9f4
 type=ethernet
-interface-name=eth0
+interface-name=eth9
 
 [ethernet]
 

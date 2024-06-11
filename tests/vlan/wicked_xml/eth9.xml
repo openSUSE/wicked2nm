@@ -1,5 +1,5 @@
-<interface origin="compat:suse:/etc/sysconfig/network/ifcfg-eth0">
-  <name>eth0</name>
+<interface origin="compat:suse:/etc/sysconfig/network/ifcfg-eth9">
+  <name>eth9</name>
   <control>
     <mode>boot</mode>
   </control>

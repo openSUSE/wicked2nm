@@ -1,5 +1,5 @@
-<interface origin="compat:suse:/etc/sysconfig/network/ifcfg-eth2">
-  <name>eth2</name>
+<interface origin="compat:suse:/etc/sysconfig/network/ifcfg-eth7">
+  <name>eth7</name>
   <control>
     <mode>boot</mode>
   </control>

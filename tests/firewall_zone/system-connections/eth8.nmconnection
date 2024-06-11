@@ -1,8 +1,8 @@
 [connection]
-id=eth1
+id=eth8
 uuid=17dad0f7-8cad-411a-9ae4-af22f8feb67c
 type=ethernet
-interface-name=eth1
+interface-name=eth8
 zone=topsecret
 
 [ethernet]

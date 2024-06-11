@@ -1,8 +1,8 @@
 [connection]
-id=eth3
-uuid=ee291fe1-7dd3-4376-9c63-4228fab9df27
+id=eth9
+uuid=a123047b-232e-4b86-9f69-851e7690deaa
 type=ethernet
-interface-name=eth3
+interface-name=eth9
 
 [ethernet]
 

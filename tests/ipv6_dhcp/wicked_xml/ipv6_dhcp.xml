@@ -1,5 +1,5 @@
-<interface origin="compat:suse:/etc/sysconfig/network/ifcfg-eth3">
-  <name>eth3</name>
+<interface origin="compat:suse:/etc/sysconfig/network/ifcfg-eth6">
+  <name>eth6</name>
   <control>
     <mode>boot</mode>
   </control>
@@ -26,8 +26,8 @@
     <release-lease>false</release-lease>
   </ipv6:dhcp>
 </interface>
-<interface origin="compat:suse:/etc/sysconfig/network/ifcfg-eth4">
-  <name>eth4</name>
+<interface origin="compat:suse:/etc/sysconfig/network/ifcfg-eth5">
+  <name>eth5</name>
   <control>
     <mode>boot</mode>
   </control>
