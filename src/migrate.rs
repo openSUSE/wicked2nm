@@ -1,6 +1,6 @@
 use crate::bridge::BridgePort;
 use crate::{reader::read as wicked_read, MIGRATION_SETTINGS};
-use agama_server::network::model::Connection;
+use agama_server::network::model::{Connection, GeneralState};
 use agama_server::network::{Adapter, NetworkManagerAdapter, NetworkState};
 use std::{collections::HashMap, error::Error};
 use uuid::Uuid;
@@ -116,7 +116,7 @@ pub async fn migrate(paths: Vec<String>) -> Result<(), Box<dyn Error>> {
     update_parent_connection(&mut connections, parents)?;
     update_bridge_ports(&mut connections, bridge_ports)?;
 
-    let mut state = NetworkState::new(vec![], vec![]);
+    let mut state = NetworkState::new(GeneralState::default(), vec![], vec![], vec![]);
     for connection in &connections {
         state.add_connection(connection.clone())?;
     }

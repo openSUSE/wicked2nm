@@ -4,6 +4,7 @@ use crate::infiniband::{Infiniband, InfinibandChild};
 use crate::vlan::Vlan;
 use crate::wireless::Wireless;
 use crate::MIGRATION_SETTINGS;
+use agama_lib::network::types::Status;
 use agama_server::network::model::{self, IpConfig, IpRoute, Ipv4Method, Ipv6Method, MacAddress};
 use cidr::IpInet;
 use serde::{Deserialize, Serialize};
@@ -150,13 +151,13 @@ impl Interface {
             firewall_zone: self.firewall.zone.clone(),
             interface: Some(self.name.clone()),
             ip_config: ip_config.ip_config,
-            status: model::Status::Down,
+            status: Status::Down,
             ..Default::default()
         };
         let mut connections: Vec<model::Connection> = vec![];
 
         if settings.activate_connections {
-            connection.status = model::Status::Up;
+            connection.status = Status::Up;
         }
 
         if let Some(ethernet) = &self.ethernet {
