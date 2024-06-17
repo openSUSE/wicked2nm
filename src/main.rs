@@ -4,6 +4,7 @@ mod infiniband;
 mod interface;
 mod migrate;
 mod reader;
+mod tuntap;
 mod vlan;
 mod wireless;
 

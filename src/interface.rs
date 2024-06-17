@@ -1,6 +1,8 @@
 use crate::bond::Bond;
 use crate::bridge::Bridge;
 use crate::infiniband::{Infiniband, InfinibandChild};
+use crate::tuntap::Tap;
+use crate::tuntap::Tun;
 use crate::vlan::Vlan;
 use crate::wireless::Wireless;
 use crate::MIGRATION_SETTINGS;
@@ -40,6 +42,8 @@ pub struct Interface {
     pub infiniband: Option<Infiniband>,
     #[serde(rename = "infiniband-child")]
     pub infiniband_child: Option<InfinibandChild>,
+    pub tun: Option<Tun>,
+    pub tap: Option<Tap>,
 }
 
 #[skip_serializing_none]
@@ -211,6 +215,12 @@ impl Interface {
                 ));
             }
             connection.config = infiniband_child.into();
+            connections.push(connection)
+        } else if let Some(tun) = &self.tun {
+            connection.config = tun.into();
+            connections.push(connection)
+        } else if let Some(tap) = &self.tap {
+            connection.config = tap.into();
             connections.push(connection)
         } else {
             connections.push(connection);
