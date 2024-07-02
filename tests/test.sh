@@ -3,7 +3,7 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 BOLD='\033[1m'
 NC='\033[0m'
-RESULT=0
+FAILED_TESTS=()
 MIGRATE_WICKED_BIN=../target/debug/migrate-wicked
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 cd $SCRIPT_DIR
@@ -45,7 +45,7 @@ for test_dir in ${TEST_DIRS}; do
     $MIGRATE_WICKED_BIN show $test_dir/wicked_xml
     if [ $? -ne 0 ] && [ "$expect_fail" = false ]; then
         error_msg ${test_dir} "show failed"
-        RESULT=1
+        FAILED_TESTS+=("${test_dir}::show")
     fi
 
     if [ "$expect_fail" = true ]; then
@@ -55,7 +55,7 @@ for test_dir in ${TEST_DIRS}; do
     fi
     if [ $? -ne 0 ] && [ "$expect_fail" = false ]; then
         error_msg ${test_dir} "migration failed"
-        RESULT=1
+        FAILED_TESTS+=("${test_dir}::migrate")
         continue
     elif [ $? -ne 0 ] && [ "$expect_fail" = true ]; then
         echo -e "${GREEN}Migration for $test_dir failed as expected${NC}"
@@ -64,17 +64,22 @@ for test_dir in ${TEST_DIRS}; do
         diff --unified=0 --color=always -I uuid $test_dir/system-connections/$cmp_file /etc/NetworkManager/system-connections/${cmp_file}
         if [ $? -ne 0 ]; then
             error_msg ${test_dir} "$cmp_file didn't match"
-            RESULT=1
+            FAILED_TESTS+=("${test_dir}::compare_config::${cmp_file}")
         else
             echo -e "${GREEN}Migration for connection ${cmp_file/\.nmconnection/} successful${NC}"
         fi
     done
+
     [ "$NO_CLEANUP" -gt 0 ] || nm_cleanup
 done
 
-if [ $RESULT -eq 0 ]; then
+if [ ${#FAILED_TESTS[@]} -eq 0 ]; then
     echo -e "${GREEN}All tests successful${NC}"
 else
-    echo -e "${RED}Some tests failed${NC}"
+    echo -e "${RED}Failed test cases:"
+    for testcase in "${FAILED_TESTS[@]}"; do
+        echo "  $testcase"
+    done
+    echo -n -e "${NC}"
+    exit 1
 fi
-exit $RESULT
