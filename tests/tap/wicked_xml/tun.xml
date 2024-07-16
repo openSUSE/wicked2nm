@@ -1,0 +1,12 @@
+<interface origin="compat:suse:/etc/sysconfig/network/ifcfg-tap9">
+  <name>tap9</name>
+  <control>
+    <mode>boot</mode>
+  </control>
+  <firewall/>
+  <tap>
+    <owner>0</owner>
+    <group>0</group>
+  </tap>
+  <link/>
+</interface>

@@ -1,0 +1,12 @@
+<interface origin="compat:suse:/etc/sysconfig/network/ifcfg-tun9">
+  <name>tun9</name>
+  <control>
+    <mode>boot</mode>
+  </control>
+  <firewall/>
+  <tun>
+    <owner>0</owner>
+    <group>0</group>
+  </tun>
+  <link/>
+</interface>
