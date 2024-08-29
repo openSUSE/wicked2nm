@@ -84,7 +84,7 @@ pub fn read(paths: Vec<String>) -> Result<InterfacesResult, anyhow::Error> {
         warning: None,
     };
 
-    if !settings.without_netconfig {
+    if settings.with_netconfig {
         match read_netconfig(settings.netconfig_path.clone()) {
             Ok(netconfig) => result.netconfig = netconfig,
             Err(e) => {

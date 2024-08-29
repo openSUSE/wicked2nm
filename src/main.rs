@@ -91,7 +91,7 @@ async fn run_command(cli: Cli) -> anyhow::Result<()> {
                     continue_migration: true,
                     dry_run: false,
                     activate_connections: true,
-                    without_netconfig: cli.global_opts.without_netconfig,
+                    with_netconfig: !cli.global_opts.without_netconfig,
                     netconfig_path: cli.global_opts.netconfig_path,
                 })
                 .expect("MIGRATION_SETTINGS was set too early");
@@ -129,7 +129,7 @@ async fn run_command(cli: Cli) -> anyhow::Result<()> {
                     continue_migration,
                     dry_run,
                     activate_connections,
-                    without_netconfig: cli.global_opts.without_netconfig,
+                    with_netconfig: !cli.global_opts.without_netconfig,
                     netconfig_path: cli.global_opts.netconfig_path,
                 })
                 .expect("MIGRATION_SETTINGS was set too early");
@@ -166,7 +166,7 @@ struct MigrationSettings {
     continue_migration: bool,
     dry_run: bool,
     activate_connections: bool,
-    without_netconfig: bool,
+    with_netconfig: bool,
     netconfig_path: String,
 }
 
@@ -176,7 +176,7 @@ impl Default for MigrationSettings {
             continue_migration: false,
             dry_run: false,
             activate_connections: true,
-            without_netconfig: false,
+            with_netconfig: false,
             netconfig_path: "".to_string(),
         }
     }
