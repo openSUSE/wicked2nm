@@ -17,7 +17,7 @@ use std::process::{ExitCode, Termination};
 use tokio::sync::OnceCell;
 
 #[derive(Parser)]
-#[command(name = "migrate-wicked", version, about, long_about = None)]
+#[command(name = "migrate-wicked", version(concat!(env!("CARGO_PKG_VERSION"),"~",env!("GIT_HEAD"))), about, long_about = None)]
 struct Cli {
     #[clap(flatten)]
     global_opts: GlobalOpts,
