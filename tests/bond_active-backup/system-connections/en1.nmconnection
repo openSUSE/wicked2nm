@@ -4,9 +4,7 @@ uuid=9269bbb4-a771-406f-ba66-3f65ed15634c
 type=ethernet
 controller=bond0
 interface-name=en1
-master=bond0
 port-type=bond
-slave-type=bond
 
 [ethernet]
 

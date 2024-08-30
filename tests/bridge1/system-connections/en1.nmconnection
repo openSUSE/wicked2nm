@@ -4,9 +4,7 @@ uuid=f760dace-c275-4983-ab36-51c8e9642dfc
 type=ethernet
 controller=br0
 interface-name=en1
-master=br0
 port-type=bridge
-slave-type=bridge
 
 [ethernet]
 
