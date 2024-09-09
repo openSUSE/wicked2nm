@@ -197,6 +197,9 @@ impl Interface {
                         wireless_connection.id.push_str(&format!("-{}", i));
                     }
                     wireless_connection.config = network.try_into()?;
+                    if let Some(wpa_eap) = &network.wpa_eap {
+                        wireless_connection.ieee_8021x_config = Some(wpa_eap.try_into()?);
+                    }
                     connections.push(wireless_connection);
                 }
             }

@@ -10,7 +10,10 @@ mode=adhoc
 ssid=example_ssid2
 
 [wifi-security]
+group=ccmp;
 key-mgmt=wpa-psk
+pairwise=ccmp;
+pmf=2
 psk=example_passwd2
 
 [match]
