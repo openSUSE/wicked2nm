@@ -1,13 +1,13 @@
 [connection]
 id=wlan1
-uuid=3bc52d5e-4095-4e1a-9976-d46f766bb627
+uuid=9d48ef42-2c96-4e43-8ab6-6c66385efdb6
 type=wifi
 interface-name=wlan1
 
 [wifi]
 bssid=12:34:56:78:9A:BC
 mode=infrastructure
-ssid=test
+ssid=wep_1
 
 [wifi-security]
 auth-alg=shared

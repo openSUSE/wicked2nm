@@ -1,6 +1,6 @@
 [connection]
 id=wlan0-0
-uuid=1089cc84-f99f-4bb8-8a0d-fafde6544e85
+uuid=2a262d6e-ccba-4afb-a190-ec08d0175c56
 type=wifi
 interface-name=wlan0
 

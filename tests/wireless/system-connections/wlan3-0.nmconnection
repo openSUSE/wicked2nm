@@ -1,20 +1,17 @@
 [connection]
-id=wlan0-1
-uuid=e05ab8eb-9905-4746-b81a-54e190b16354
+id=wlan3-0
+uuid=899c6026-3000-4ca2-8526-216471cef61a
 type=wifi
-interface-name=wlan0
+interface-name=wlan3
 
 [wifi]
 hidden=true
-mode=adhoc
-ssid=example_ssid2
+mode=infrastructure
+ssid=psk_1
 
 [wifi-security]
-group=ccmp;
 key-mgmt=wpa-psk
-pairwise=ccmp;
-pmf=2
-psk=example_passwd2
+psk=total_geheim!!
 
 [match]
 

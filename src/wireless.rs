@@ -22,7 +22,7 @@ pub struct Wireless {
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Default)]
 pub struct Network {
     pub essid: String,
     #[serde(rename = "scan-ssid")]
@@ -95,7 +95,7 @@ pub struct Wep {
 }
 
 #[serde_as]
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Default)]
 pub struct WpaEap {
     pub method: WickedEapMethods,
     pub identity: Option<String>,
@@ -211,11 +211,20 @@ impl From<&EapAuthProto> for model::WPAProtocolVersion {
 }
 
 #[derive(
-    Debug, PartialEq, SerializeDisplay, DeserializeFromStr, EnumString, Display, Clone, Copy,
+    Debug,
+    PartialEq,
+    SerializeDisplay,
+    DeserializeFromStr,
+    EnumString,
+    Display,
+    Clone,
+    Copy,
+    Default,
 )]
 #[strum(serialize_all = "snake_case")]
 pub enum WickedEapMethods {
     Wpa,
+    #[default]
     None,
     Md5,
     Tls,
@@ -416,27 +425,90 @@ where
     Ok(Some(Networks::deserialize(deserializer)?.network))
 }
 
-fn wireless_security_protocol(
-    wicked_value: &[String],
+fn all(array: &[String], needle: &[&str]) -> bool {
+    if array.is_empty() {
+        return false;
+    }
+
+    array.iter().all(|x| needle.iter().any(|&y| x == y))
+}
+
+fn any(array: &[String], needle: &[&str]) -> bool {
+    if array.is_empty() {
+        return false;
+    }
+
+    array.iter().any(|x| needle.iter().any(|&y| x == y))
+}
+
+fn guess_wireless_security_protocol(
+    network: &Network,
 ) -> Result<model::SecurityProtocol, anyhow::Error> {
-    if wicked_value.contains(&"wpa-psk".to_string())
-        || wicked_value.contains(&"wpa-psk-sha256".to_string())
-    {
-        Ok(model::SecurityProtocol::WPA2)
-    } else if wicked_value.contains(&"sae".to_string()) {
-        Ok(model::SecurityProtocol::WPA3Personal)
-    } else if wicked_value.contains(&"wpa-eap".to_string())
-        || wicked_value.contains(&"wpa-eap-sha256".to_string())
-    {
-        Ok(model::SecurityProtocol::WPA2Enterprise)
-    } else if wicked_value.contains(&"owe".to_string()) {
-        Ok(model::SecurityProtocol::OWE)
-    } else if wicked_value.contains(&"wpa-eap-suite-b-192".to_string()) {
-        Ok(model::SecurityProtocol::WPA3Only)
-    } else if wicked_value.contains(&"none".to_string()) {
-        Ok(model::SecurityProtocol::WEP)
+    let mgmt = &network.key_management;
+
+    let result = if any(mgmt, &["wpa-eap", "wpa-eap-sha256"]) {
+        model::SecurityProtocol::WPA2Enterprise
+    } else if any(mgmt, &["wpa-eap-suite-b-192", "wpa-eap-suite-b"]) {
+        model::SecurityProtocol::WPA3Only
+    } else if any(mgmt, &["wpa-psk", "wpa-psk-sha256"]) {
+        model::SecurityProtocol::WPA2
+    } else if any(mgmt, &["sae", "ft-sae"]) {
+        model::SecurityProtocol::WPA3Personal
+    } else if any(mgmt, &["owe"]) {
+        model::SecurityProtocol::OWE
+    } else if any(mgmt, &["none"]) {
+        model::SecurityProtocol::WEP
+    } else if network.wpa_eap.is_some() {
+        model::SecurityProtocol::WPA2Enterprise
+    } else if network.wpa_psk.is_some() {
+        model::SecurityProtocol::WPA2
     } else {
-        Err(anyhow!("Unrecognized key-management protocol"))
+        model::SecurityProtocol::WEP
+    };
+    log::warn!(
+        "Unsupported key-management protocol(s) '{}' guessing '{}'",
+        mgmt.join(","),
+        result
+    );
+    Ok(result)
+}
+
+fn wireless_security_protocol(network: &Network) -> Result<model::SecurityProtocol, anyhow::Error> {
+    let mgmt = &network.key_management;
+
+    if all(mgmt, &["sae", "ft-sae"]) {
+        Ok(model::SecurityProtocol::WPA3Personal)
+    } else if all(mgmt, &["wpa-psk", "wpa-psk-sha256", "sae", "ft-sae"]) {
+        Ok(model::SecurityProtocol::WPA2)
+    } else if all(mgmt, &["wpa-eap-suite-b-192", "wpa-eap-suite-b"]) {
+        Ok(model::SecurityProtocol::WPA3Only)
+    } else if all(
+        mgmt,
+        &[
+            "wpa-eap",
+            "wpa-eap-sha256",
+            "wpa-eap-suite-b-192",
+            "wpa-eap-suite-b",
+        ],
+    ) {
+        Ok(model::SecurityProtocol::WPA2Enterprise)
+    } else if all(mgmt, &["owe"]) {
+        Ok(model::SecurityProtocol::OWE)
+    } else if all(mgmt, &["none"]) {
+        Ok(model::SecurityProtocol::WEP)
+    } else if mgmt.is_empty() {
+        if network.wpa_eap.is_some() {
+            Ok(model::SecurityProtocol::WPA2Enterprise)
+        } else if network.wpa_psk.is_some() {
+            Ok(model::SecurityProtocol::WPA2)
+        } else {
+            Ok(model::SecurityProtocol::WEP)
+        }
+    } else {
+        Err(anyhow!(
+            "Unrecognized key-management protocol(s): {}",
+            mgmt.join(",")
+        ))
     }
 }
 
@@ -451,14 +523,11 @@ impl TryFrom<&Network> for model::ConnectionConfig {
             ..Default::default()
         };
 
-        if network.key_management.len() > 1 && settings.continue_migration {
-            log::warn!("Migration of multiple key-management algorithms isn't supported")
-        } else if network.key_management.len() > 1 {
-            return Err(anyhow!(
-                "Migration of multiple key-management algorithms isn't supported"
-            ));
+        let mut sec = wireless_security_protocol(network);
+        if sec.is_err() && settings.continue_migration {
+            sec = guess_wireless_security_protocol(network);
         }
-        config.security = wireless_security_protocol(&network.key_management)?;
+        config.security = sec?;
 
         if let Some(wpa_psk) = &network.wpa_psk {
             config.password = Some(wpa_psk.passphrase.clone());
@@ -638,5 +707,148 @@ mod tests {
             })
         );
         assert_eq!(wireless.band, Some("bg".try_into().unwrap()));
+    }
+
+    #[test]
+    fn wireless_security_protocol_strict() {
+        setup_default_migration_settings();
+
+        let mut net = Network {
+            ..Default::default()
+        };
+
+        net.key_management = vec![];
+        assert_eq!(
+            wireless_security_protocol(&net).unwrap(),
+            model::SecurityProtocol::WEP
+        );
+
+        net.key_management = vec![];
+        net.wpa_eap = Some(WpaEap {
+            ..Default::default()
+        });
+
+        assert_eq!(
+            wireless_security_protocol(&net).unwrap(),
+            model::SecurityProtocol::WPA2Enterprise
+        );
+
+        net.wpa_eap = None;
+        net.wpa_psk = Some(WpaPsk {
+            ..Default::default()
+        });
+        assert_eq!(
+            wireless_security_protocol(&net).unwrap(),
+            model::SecurityProtocol::WPA2
+        );
+
+        net.wpa_psk = None;
+        net.key_management = vec!["wpa-psk".to_string()];
+        assert_eq!(
+            wireless_security_protocol(&net).unwrap(),
+            model::SecurityProtocol::WPA2
+        );
+        net.key_management = vec!["sae".to_string(), "wpa-psk".to_string()];
+        assert_eq!(
+            wireless_security_protocol(&net).unwrap(),
+            model::SecurityProtocol::WPA2
+        );
+        net.key_management = vec!["sae".to_string()];
+        assert_eq!(
+            wireless_security_protocol(&net).unwrap(),
+            model::SecurityProtocol::WPA3Personal
+        );
+
+        net.key_management = vec!["wpa-eap".to_string()];
+        assert_eq!(
+            wireless_security_protocol(&net).unwrap(),
+            model::SecurityProtocol::WPA2Enterprise
+        );
+        net.key_management = vec!["wpa-eap".to_string(), "wpa-eap-suite-b".to_string()];
+        assert_eq!(
+            wireless_security_protocol(&net).unwrap(),
+            model::SecurityProtocol::WPA2Enterprise
+        );
+        net.key_management = vec!["wpa-eap-suite-b".to_string()];
+        assert_eq!(
+            wireless_security_protocol(&net).unwrap(),
+            model::SecurityProtocol::WPA3Only
+        );
+
+        net.key_management = vec!["owe".to_string()];
+        assert_eq!(
+            wireless_security_protocol(&net).unwrap(),
+            model::SecurityProtocol::OWE
+        );
+
+        net.key_management = vec!["none".to_string()];
+        assert_eq!(
+            wireless_security_protocol(&net).unwrap(),
+            model::SecurityProtocol::WEP
+        );
+
+        net.key_management = vec!["none".to_string(), "wpa-psk".to_string()];
+        assert!(wireless_security_protocol(&net).is_err());
+        net.key_management = vec!["wpa-eap".to_string(), "wpa-psk".to_string()];
+        assert!(wireless_security_protocol(&net).is_err());
+        net.key_management = vec!["wpa-eap".to_string(), "sae".to_string()];
+        assert!(wireless_security_protocol(&net).is_err());
+        net.key_management = vec!["wpa-eap-suite-b".to_string(), "sae".to_string()];
+        assert!(wireless_security_protocol(&net).is_err());
+        net.key_management = vec!["wpa-eap-suite-b".to_string(), "owe".to_string()];
+        assert!(wireless_security_protocol(&net).is_err());
+        net.key_management = vec!["wpa-psk".to_string(), "owe".to_string()];
+        assert!(wireless_security_protocol(&net).is_err());
+    }
+
+    #[test]
+    fn wireless_security_protocol_continue_migration() {
+        setup_default_migration_settings();
+
+        let mut net = Network {
+            ..Default::default()
+        };
+
+        net.key_management = vec![];
+        assert_eq!(
+            wireless_security_protocol(&net).unwrap(),
+            model::SecurityProtocol::WEP
+        );
+
+        net.key_management = vec![];
+        net.wpa_eap = Some(WpaEap {
+            ..Default::default()
+        });
+
+        net.key_management = vec!["none".to_string(), "wpa-psk".to_string()];
+        assert_eq!(
+            guess_wireless_security_protocol(&net).unwrap(),
+            model::SecurityProtocol::WPA2
+        );
+        net.key_management = vec!["wpa-eap".to_string(), "wpa-psk".to_string()];
+        assert_eq!(
+            guess_wireless_security_protocol(&net).unwrap(),
+            model::SecurityProtocol::WPA2Enterprise
+        );
+        net.key_management = vec!["wpa-eap".to_string(), "sae".to_string()];
+        assert_eq!(
+            guess_wireless_security_protocol(&net).unwrap(),
+            model::SecurityProtocol::WPA2Enterprise
+        );
+        net.key_management = vec!["wpa-eap-suite-b".to_string(), "sae".to_string()];
+        assert_eq!(
+            guess_wireless_security_protocol(&net).unwrap(),
+            model::SecurityProtocol::WPA3Only
+        );
+        net.key_management = vec!["wpa-eap-suite-b".to_string(), "owe".to_string()];
+        assert_eq!(
+            guess_wireless_security_protocol(&net).unwrap(),
+            model::SecurityProtocol::WPA3Only
+        );
+        net.key_management = vec!["wpa-psk".to_string(), "owe".to_string()];
+        assert_eq!(
+            guess_wireless_security_protocol(&net).unwrap(),
+            model::SecurityProtocol::WPA2
+        );
     }
 }
