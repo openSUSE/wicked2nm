@@ -131,7 +131,7 @@ impl TryFrom<&Network> for model::ConnectionConfig {
             config.password = Some(wpa_psk.passphrase.clone())
         }
         if let Some(channel) = network.channel {
-            config.channel = Some(channel);
+            config.channel = channel;
             if channel <= 14 {
                 config.band = Some("bg".try_into().unwrap());
             } else {
