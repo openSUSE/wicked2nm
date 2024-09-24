@@ -1,8 +1,8 @@
 [connection]
-id=eth5
-uuid=79dac508-d8ae-4bae-82bc-8590c9e501cd
+id=eth6
+uuid=f429f20c-8e87-4e84-8380-4fbcc1bcd371
 type=ethernet
-interface-name=eth5
+interface-name=eth6
 
 [ethernet]
 

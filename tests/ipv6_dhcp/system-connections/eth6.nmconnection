@@ -9,7 +9,7 @@ interface-name=eth6
 [match]
 
 [ipv4]
-method=auto
+method=disabled
 
 [ipv6]
 addr-gen-mode=default

@@ -23,6 +23,8 @@ pub struct Interface {
     pub ipv4: Ipv4,
     #[serde(rename = "ipv4-static")]
     pub ipv4_static: Option<Ipv4Static>,
+    #[serde(rename = "ipv4-dhcp")]
+    pub ipv4_dhcp: Option<Ipv4Dhcp>,
     pub ipv6: Ipv6,
     #[serde(rename = "ipv6-static")]
     pub ipv6_static: Option<Ipv6Static>,
@@ -61,16 +63,32 @@ pub struct Link {
     pub mtu: Option<u32>,
 }
 
-#[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
-#[serde(default)]
+fn default_true() -> bool {
+    true
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Ipv4 {
+    #[serde(default = "default_true")]
     pub enabled: bool,
 }
 
-#[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
-#[serde(default)]
+impl Default for Ipv4 {
+    fn default() -> Self {
+        Self { enabled: true }
+    }
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Ipv6 {
+    #[serde(default = "default_true")]
     pub enabled: bool,
+}
+
+impl Default for Ipv6 {
+    fn default() -> Self {
+        Self { enabled: true }
+    }
 }
 
 #[skip_serializing_none]
@@ -80,6 +98,11 @@ pub struct Ipv4Static {
     pub addresses: Option<Vec<Address>>,
     #[serde(rename = "route")]
     pub routes: Option<Vec<Route>>,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct Ipv4Dhcp {
+    pub enabled: bool,
 }
 
 #[skip_serializing_none]
@@ -242,19 +265,18 @@ impl Interface {
             },
             warnings: vec![],
         };
-        let method4 = if self.ipv4.enabled && self.ipv4_static.is_some() {
+        let method4 = if self.ipv4_static.is_some() {
             Ipv4Method::Manual
         } else if !self.ipv4.enabled {
             Ipv4Method::Disabled
-        } else {
+        } else if self.ipv4_dhcp.is_some() {
             Ipv4Method::Auto
+        } else {
+            Ipv4Method::Disabled
         };
-        let method6 = if self.ipv6.enabled && self.ipv6_static.is_some() {
+        let method6 = if self.ipv6_static.is_some() {
             Ipv6Method::Manual
-        } else if self.ipv6.enabled
-            && self.ipv6_dhcp.is_some()
-            && self.ipv6_dhcp.as_ref().unwrap().mode == "managed"
-        {
+        } else if self.ipv6_dhcp.is_some() && self.ipv6_dhcp.as_ref().unwrap().mode == "managed" {
             Ipv6Method::Dhcp
         } else if !self.ipv6.enabled {
             Ipv6Method::Disabled
@@ -451,8 +473,7 @@ mod tests {
     fn test_dhcp_interface_to_connection() {
         setup_default_migration_settings();
         let static_interface = Interface {
-            ipv4: Ipv4 { enabled: true },
-            ipv6: Ipv6 { enabled: true },
+            ipv4_dhcp: Some(Ipv4Dhcp { enabled: true }),
             ..Default::default()
         };
 

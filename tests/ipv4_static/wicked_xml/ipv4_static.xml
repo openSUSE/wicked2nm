@@ -23,3 +23,26 @@
     <accept-redirects>false</accept-redirects>
   </ipv6>
 </interface>
+<interface origin="compat:suse:/etc/sysconfig/network/ifcfg-eth9">
+  <name>eth9</name>
+  <control>
+    <mode>boot</mode>
+  </control>
+  <firewall/>
+  <link/>
+  <ipv4>
+    <arp-verify>true</arp-verify>
+  </ipv4>
+  <ipv4:static>
+    <address>
+      <local>192.168.100.5/24</local>
+    </address>
+    <address>
+      <local>192.168.101.5/24</local>
+    </address>
+  </ipv4:static>
+  <ipv6>
+    <privacy>prefer-public</privacy>
+    <accept-redirects>false</accept-redirects>
+  </ipv6>
+</interface>

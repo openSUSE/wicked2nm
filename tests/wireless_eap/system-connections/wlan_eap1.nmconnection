@@ -28,6 +28,6 @@ method=disabled
 
 [ipv6]
 addr-gen-mode=default
-method=disabled
+method=auto
 
 [proxy]
