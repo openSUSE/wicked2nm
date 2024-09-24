@@ -141,7 +141,7 @@ async fn run_command(cli: Cli) -> anyhow::Result<()> {
 
             match migrate(paths).await {
                 Ok(()) => Ok(()),
-                Err(e) => Err(anyhow::anyhow!("Migration failed: {:?}", e)),
+                Err(e) => Err(anyhow::anyhow!("Migration failed: {}", e)),
             }
         }
     }
@@ -197,7 +197,7 @@ async fn main() -> CliResult {
     .unwrap();
 
     if let Err(error) = run_command(cli).await {
-        eprintln!("{:?}", error);
+        log::error!("{}", error);
         return CliResult::Error;
     }
 
