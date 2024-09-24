@@ -15,6 +15,7 @@ use log::*;
 use migrate::migrate;
 use reader::read as wicked_read;
 use serde::Serialize;
+use simplelog::ConfigBuilder;
 use std::process::{ExitCode, Termination};
 use tokio::sync::OnceCell;
 
@@ -188,9 +189,14 @@ static MIGRATION_SETTINGS: OnceCell<MigrationSettings> = OnceCell::const_new();
 async fn main() -> CliResult {
     let cli = Cli::parse();
 
+    let config = ConfigBuilder::new()
+        .set_time_level(LevelFilter::Off)
+        .add_filter_allow("migrate_wicked".to_string())
+        .build();
+
     simplelog::TermLogger::init(
         cli.global_opts.log_level,
-        simplelog::Config::default(),
+        config,
         simplelog::TerminalMode::Stderr,
         simplelog::ColorChoice::Auto,
     )
