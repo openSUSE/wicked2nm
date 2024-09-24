@@ -34,7 +34,7 @@ struct Cli {
 
 #[derive(Debug, Args)]
 struct GlobalOpts {
-    #[arg(long, global = true, default_value_t = LevelFilter::Warn, value_parser = clap::builder::PossibleValuesParser::new(["TRACE", "DEBUG", "INFO", "WARN", "ERROR"]).map(|s| s.parse::<LevelFilter>().unwrap()),)]
+    #[arg(long, global = true, default_value_t = LevelFilter::Info, value_parser = clap::builder::PossibleValuesParser::new(["TRACE", "DEBUG", "INFO", "WARN", "ERROR"]).map(|s| s.parse::<LevelFilter>().unwrap()),)]
     pub log_level: LevelFilter,
 
     #[arg(long, global = true, env = "MIGRATE_WICKED_WITHOUT_NETCONFIG")]
