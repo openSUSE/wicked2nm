@@ -101,6 +101,14 @@ pub fn read(paths: Vec<String>) -> Result<InterfacesResult, anyhow::Error> {
         if path.is_dir() {
             let files = recurse_files(path)?;
             for file in files {
+                match file.extension() {
+                    None => continue,
+                    Some(ext) => {
+                        if !ext.eq("xml") {
+                            continue;
+                        }
+                    }
+                }
                 let mut read_xml = read_xml_file(file)?;
                 if result.warning.is_none() && read_xml.warning.is_some() {
                     result.warning = read_xml.warning
