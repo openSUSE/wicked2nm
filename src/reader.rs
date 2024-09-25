@@ -27,7 +27,7 @@ pub fn read_xml_file(path: PathBuf) -> Result<InterfacesResult, anyhow::Error> {
     let deserializer = &mut quick_xml::de::Deserializer::from_str(replaced_string.as_str());
     let mut unhandled_fields = vec![];
     let interfaces: Vec<Interface> = match serde_ignored::deserialize(deserializer, |path| {
-        unhandled_fields.push(path.to_string());
+        unhandled_fields.push(path.to_string())
     }) {
         Ok(interfaces) => interfaces,
         Err(e) => {
