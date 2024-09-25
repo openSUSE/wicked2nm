@@ -15,6 +15,7 @@ use log::*;
 use migrate::migrate;
 use reader::read as wicked_read;
 use serde::Serialize;
+use simplelog::ConfigBuilder;
 use std::process::{ExitCode, Termination};
 use tokio::sync::OnceCell;
 
@@ -33,7 +34,7 @@ struct Cli {
 
 #[derive(Debug, Args)]
 struct GlobalOpts {
-    #[arg(long, global = true, default_value_t = LevelFilter::Warn, value_parser = clap::builder::PossibleValuesParser::new(["TRACE", "DEBUG", "INFO", "WARN", "ERROR"]).map(|s| s.parse::<LevelFilter>().unwrap()),)]
+    #[arg(long, global = true, default_value_t = LevelFilter::Info, value_parser = clap::builder::PossibleValuesParser::new(["TRACE", "DEBUG", "INFO", "WARN", "ERROR"]).map(|s| s.parse::<LevelFilter>().unwrap()),)]
     pub log_level: LevelFilter,
 
     #[arg(long, global = true, env = "MIGRATE_WICKED_WITHOUT_NETCONFIG")]
@@ -141,7 +142,7 @@ async fn run_command(cli: Cli) -> anyhow::Result<()> {
 
             match migrate(paths).await {
                 Ok(()) => Ok(()),
-                Err(e) => Err(anyhow::anyhow!("Migration failed: {:?}", e)),
+                Err(e) => Err(anyhow::anyhow!("Migration failed: {}", e)),
             }
         }
     }
@@ -188,16 +189,21 @@ static MIGRATION_SETTINGS: OnceCell<MigrationSettings> = OnceCell::const_new();
 async fn main() -> CliResult {
     let cli = Cli::parse();
 
+    let config = ConfigBuilder::new()
+        .set_time_level(LevelFilter::Off)
+        .add_filter_allow("migrate_wicked".to_string())
+        .build();
+
     simplelog::TermLogger::init(
         cli.global_opts.log_level,
-        simplelog::Config::default(),
+        config,
         simplelog::TerminalMode::Stderr,
         simplelog::ColorChoice::Auto,
     )
     .unwrap();
 
     if let Err(error) = run_command(cli).await {
-        eprintln!("{:?}", error);
+        log::error!("{}", error);
         return CliResult::Error;
     }
 
