@@ -1,5 +1,7 @@
 use crate::bridge::BridgePort;
-use crate::{reader::read as wicked_read, MIGRATION_SETTINGS};
+use crate::interface::Interface;
+use crate::netconfig::Netconfig;
+use crate::MIGRATION_SETTINGS;
 use agama_server::network::model::{Connection, GeneralState, IpConfig, MatchConfig, StateConfig};
 use agama_server::network::{model, Adapter, NetworkManagerAdapter, NetworkState};
 use cidr::IpInet;
@@ -95,18 +97,16 @@ fn create_lo_connection() -> Connection {
     }
 }
 
-pub async fn migrate(paths: Vec<String>) -> Result<(), Box<dyn Error>> {
-    let interfaces = wicked_read(paths.clone())?;
+pub async fn migrate(
+    interfaces: Vec<Interface>,
+    netconfig: Option<Netconfig>,
+) -> Result<(), Box<dyn Error>> {
     let settings = MIGRATION_SETTINGS.get().unwrap();
     let mut parents: HashMap<String, String> = HashMap::new();
     let mut bridge_ports: HashMap<String, BridgePort> = HashMap::new();
     let mut connections: Vec<Connection> = vec![];
 
-    if !settings.continue_migration && interfaces.warning.is_some() {
-        return Err(interfaces.warning.unwrap().into());
-    }
-
-    for interface in interfaces.interfaces {
+    for interface in interfaces {
         let connection_result = interface.to_connection()?;
         if !connection_result.warnings.is_empty() {
             for connection_error in &connection_result.warnings {
@@ -150,7 +150,7 @@ pub async fn migrate(paths: Vec<String>) -> Result<(), Box<dyn Error>> {
     }
     let nm = NetworkManagerAdapter::from_system().await?;
 
-    if let Some(netconfig) = interfaces.netconfig {
+    if let Some(netconfig) = netconfig {
         let current_state = nm.read(StateConfig::default()).await?;
         let mut loopback = match current_state.get_connection("lo") {
             Some(lo) => lo.clone(),

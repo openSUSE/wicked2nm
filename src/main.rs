@@ -57,7 +57,8 @@ pub enum Commands {
     },
     /// Migrate wicked state at path
     Migrate {
-        /// Wicked XML Files or directories where the wicked xml configs are located
+        /// Wicked XML Files or directories where the wicked xml configs are located.
+        /// Can also be "-" to read from stdin
         paths: Vec<String>,
 
         /// Continue migration if warnings are encountered
@@ -140,7 +141,13 @@ async fn run_command(cli: Cli) -> anyhow::Result<()> {
                 MIGRATION_SETTINGS.get().unwrap()
             );
 
-            match migrate(paths).await {
+            let interfaces_result = wicked_read(paths)?;
+
+            if !continue_migration && interfaces_result.warning.is_some() {
+                return Err(interfaces_result.warning.unwrap());
+            }
+
+            match migrate(interfaces_result.interfaces, interfaces_result.netconfig).await {
                 Ok(()) => Ok(()),
                 Err(e) => Err(anyhow::anyhow!("Migration failed: {}", e)),
             }
