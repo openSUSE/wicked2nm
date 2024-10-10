@@ -36,6 +36,7 @@ print_help()
   echo ""
   echo "Arguments:"
   echo "  -v|--verbose            Be more verbose"
+  echo "  --debug                 Prints out all commands executed"
   echo "  -q|--quiet              Be less verbose"
   echo "  --nm-cleanup            Cleanup current NetworkManager config before start"
   echo "  --no-cleanup            Do not cleanup NetworkManger after test"
@@ -50,6 +51,9 @@ while [[ $# -gt 0 ]]; do
   case $opt in
     -v|--verbose)
       LOG_LEVEL=$((LOG_LEVEL + 1))
+      ;;
+    --debug)
+      set -x
       ;;
     --binary)
       MIGRATE_WICKED_BIN=$1; shift
