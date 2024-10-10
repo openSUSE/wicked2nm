@@ -60,7 +60,7 @@ while [[ $# -gt 0 ]]; do
     --no-cleanup)
       NO_CLEANUP=1
       ;;
-    -q|--quite)
+    -q|--quiet)
       [ $LOG_LEVEL -gt 0 ] && LOG_LEVEL=$((LOG_LEVEL - 1))
       ;;
     -h|--help)
