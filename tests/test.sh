@@ -10,6 +10,7 @@ cd $SCRIPT_DIR
 TEST_DIRS=${TEST_DIRS:-$(ls -d */ | sed 's#/##')}
 NO_CLEANUP=${NO_CLEANUP:-0}
 LOG_LEVEL=1
+TEST_STDIN=true
 
 error_msg() {
   log_error "Error for test $1:$2"
@@ -36,6 +37,7 @@ print_help()
   echo ""
   echo "Arguments:"
   echo "  -v|--verbose            Be more verbose"
+  echo "  --debug                 Prints out all commands executed"
   echo "  -q|--quiet              Be less verbose"
   echo "  --nm-cleanup            Cleanup current NetworkManager config before start"
   echo "  --no-cleanup            Do not cleanup NetworkManger after test"
@@ -51,6 +53,9 @@ while [[ $# -gt 0 ]]; do
     -v|--verbose)
       LOG_LEVEL=$((LOG_LEVEL + 1))
       ;;
+    --debug)
+      set -x
+      ;;
     --binary)
       MIGRATE_WICKED_BIN=$1; shift
       ;;
@@ -60,7 +65,7 @@ while [[ $# -gt 0 ]]; do
     --no-cleanup)
       NO_CLEANUP=1
       ;;
-    -q|--quite)
+    -q|--quiet)
       [ $LOG_LEVEL -gt 0 ] && LOG_LEVEL=$((LOG_LEVEL - 1))
       ;;
     -h|--help)
@@ -78,7 +83,15 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [ ${#POSITIONAL_ARGS[@]} -gt 0 ]; then
-  TEST_DIRS="${POSITIONAL_ARGS[@]}"
+  TEST_STDIN=false
+  TEST_DIRS=()
+  for pos_arg in "${POSITIONAL_ARGS[@]}"; do
+      if [[ "$pos_arg" == "stdin" ]]; then
+          TEST_STDIN=true
+      else
+          TEST_DIRS+=("$pos_arg")
+      fi
+  done
 fi
 
 if [[ $(ls -A /etc/NetworkManager/system-connections/) ]]; then
@@ -146,6 +159,44 @@ for test_dir in ${TEST_DIRS}; do
 
     [ "$NO_CLEANUP" -gt 0 ] || nm_cleanup
 done
+
+if $TEST_STDIN; then
+    echo -e "${BOLD}Testing stdin show${NC}"
+    cat <<EOF | $MIGRATE_WICKED_BIN show --without-netconfig - | grep "192.168.100.5" &>/dev/null
+<interface>
+  <ipv4:static>
+    <address>
+      <local>192.168.100.5/24</local>
+    </address>
+  </ipv4:static>
+</interface>
+EOF
+    if [ $? -ne 0 ]; then
+        error_msg "stdin" "show failed"
+        FAILED_TESTS+=("stdin::show")
+    else
+        echo -e "${GREEN}stdin show successful${NC}"
+    fi
+
+    echo -e "${BOLD}Testing stdin migrate${NC}"
+    cat <<EOF | $MIGRATE_WICKED_BIN migrate --without-netconfig --dry-run --log-level DEBUG - 2>&1 | grep "192.168.100.5" &>/dev/null
+<interface>
+  <ipv4:static>
+    <address>
+      <local>192.168.100.5/24</local>
+    </address>
+  </ipv4:static>
+</interface>
+EOF
+    if [ $? -ne 0 ]; then
+        error_msg "stdin" "migrate failed"
+        FAILED_TESTS+=("stdin::migrate")
+    else
+        echo -e "${GREEN}stdin migrate successful${NC}"
+    fi
+fi
+
+echo -e "\n${BOLD}Result:${NC}"
 
 if [ ${#FAILED_TESTS[@]} -eq 0 ]; then
     echo -e "${GREEN}All tests successful${NC}"
