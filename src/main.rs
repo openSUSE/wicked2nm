@@ -52,12 +52,13 @@ pub enum Commands {
         #[arg(value_enum, short, long, default_value_t = Format::Json)]
         format: Format,
 
-        /// Wicked XML Files or directories where the wicked xml configs are located
+        /// Wicked XML files or directories where the wicked xml configs are located.
+        /// Can also be "-" to read from stdin
         paths: Vec<String>,
     },
     /// Migrate wicked state at path
     Migrate {
-        /// Wicked XML Files or directories where the wicked xml configs are located.
+        /// Wicked XML files or directories where the wicked xml configs are located.
         /// Can also be "-" to read from stdin
         paths: Vec<String>,
 
