@@ -285,8 +285,8 @@ impl Interface {
         };
 
         let mut addresses: Vec<IpInet> = vec![];
-        let mut new_routes4: Vec<IpRoute> = vec![];
-        let mut new_routes6: Vec<IpRoute> = vec![];
+        let mut routes4: Vec<IpRoute> = vec![];
+        let mut routes6: Vec<IpRoute> = vec![];
         if let Some(ipv4_static) = &self.ipv4_static {
             if let Some(addresses_in) = &ipv4_static.addresses {
                 for addr in addresses_in {
@@ -295,7 +295,7 @@ impl Interface {
             }
             if let Some(routes) = &ipv4_static.routes {
                 for route in routes {
-                    new_routes4.push(match route.try_into() {
+                    routes4.push(match route.try_into() {
                         Ok(route) => route,
                         Err(e) => {
                             connection_result.warnings.push(e);
@@ -313,7 +313,7 @@ impl Interface {
             }
             if let Some(routes) = &ipv6_static.routes {
                 for route in routes {
-                    new_routes6.push(match route.try_into() {
+                    routes6.push(match route.try_into() {
                         Ok(route) => route,
                         Err(e) => {
                             connection_result.warnings.push(e);
@@ -323,17 +323,6 @@ impl Interface {
                 }
             }
         }
-
-        let routes4 = if !new_routes4.is_empty() {
-            Some(new_routes4)
-        } else {
-            None
-        };
-        let routes6 = if !new_routes6.is_empty() {
-            Some(new_routes6)
-        } else {
-            None
-        };
 
         connection_result.ip_config = IpConfig {
             addresses,
@@ -437,31 +426,29 @@ mod tests {
                 .to_string(),
             "128"
         );
-        assert!(static_connection.ip_config.routes4.is_some());
-        assert!(static_connection.ip_config.routes4.clone().unwrap().len() == 1);
+        assert!(static_connection.ip_config.routes4.len() == 1);
         assert_eq!(
-            static_connection.ip_config.routes4.clone().unwrap()[0]
+            static_connection.ip_config.routes4[0]
                 .destination
                 .to_string(),
             "0.0.0.0/0"
         );
         assert_eq!(
-            static_connection.ip_config.routes4.clone().unwrap()[0]
+            static_connection.ip_config.routes4[0]
                 .next_hop
                 .unwrap()
                 .to_string(),
             "127.0.0.1"
         );
-        assert!(static_connection.ip_config.routes6.is_some());
-        assert!(static_connection.ip_config.routes6.clone().unwrap().len() == 1);
+        assert!(static_connection.ip_config.routes6.len() == 1);
         assert_eq!(
-            static_connection.ip_config.routes6.clone().unwrap()[0]
+            static_connection.ip_config.routes6[0]
                 .destination
                 .to_string(),
             "::/0"
         );
         assert_eq!(
-            static_connection.ip_config.routes6.clone().unwrap()[0]
+            static_connection.ip_config.routes6[0]
                 .next_hop
                 .unwrap()
                 .to_string(),

@@ -1,0 +1,59 @@
+name: Update OBS Git Package
+
+on:
+  push:
+    branches:
+      - split_migration
+
+jobs:
+  update_obs_package:
+    # do not run in forks
+    if: github.repository == 'jcronenberg/agama'
+
+    runs-on: ubuntu-latest
+
+    container:
+      image: registry.opensuse.org/opensuse/tumbleweed:latest
+
+    steps:
+      - name: Git Checkout
+        uses: actions/checkout@v3
+
+      - name: Configure and refresh repositories
+        # disable unused repositories to have a faster refresh
+        run: zypper modifyrepo -d repo-non-oss repo-openh264 repo-update && zypper ref
+
+      - name: Install tools
+        run: zypper --non-interactive install --no-recommends
+             git
+             obs-service-obs_scm
+             obs-service-cargo_vendor
+             obs-service-set_version
+             obs-service-tar
+             osc
+             cpio
+
+      - name: Configure osc
+        run: .github/workflows/configure_osc.sh
+        env:
+          OBS_USER:     ${{ secrets.OBS_USER }}
+          OBS_PASSWORD: ${{ secrets.OBS_PW }}
+
+      - name: Checkout package
+        run: osc checkout home:jcronenberg:migrate-wicked/migrate-wicked-git -o migrate-wicked-git-package
+
+      - name: Remove current obscpio
+        run: rm -f *.obscpio
+        working-directory: ./migrate-wicked-git-package
+
+      - name: Run osc service manualrun
+        run: osc service manualrun
+        working-directory: ./migrate-wicked-git-package
+
+      - name: Update current files in osc
+        run: osc ar
+        working-directory: ./migrate-wicked-git-package
+
+      - name: Commit to OBS
+        run: osc commit -m "$GITHUB_SHA"
+        working-directory: ./migrate-wicked-git-package
