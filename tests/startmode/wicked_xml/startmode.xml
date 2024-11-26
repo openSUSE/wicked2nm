@@ -58,3 +58,20 @@
     <enabled>true</enabled>
   </ipv6>
 </interface>
+<interface origin="compat:suse:/etc/sysconfig/network/ifcfg-startmode4">
+  <name>startmode4</name>
+  <control>
+    <mode>boot</mode>
+    <boot-stage>localfs</boot-stage>
+    <persistent>true</persistent>
+  </control>
+  <firewall/>
+  <dummy/>
+  <link/>
+  <ipv4>
+    <enabled>true</enabled>
+  </ipv4>
+  <ipv6>
+    <enabled>true</enabled>
+  </ipv6>
+</interface>

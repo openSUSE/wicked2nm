@@ -165,6 +165,11 @@ pub struct Nexthop {
 pub struct Control {
     #[serde(default)]
     pub mode: ControlMode,
+    // ignored
+    #[serde(rename = "boot-stage")]
+    pub boot_stage: Option<String>,
+    // ignored
+    pub persistent: Option<String>,
 }
 
 #[derive(
