@@ -10,8 +10,9 @@ use agama_lib::network::types::Status;
 use agama_server::network::model::{self, IpConfig, IpRoute, Ipv4Method, Ipv6Method, MacAddress};
 use cidr::IpInet;
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, skip_serializing_none};
+use serde_with::{serde_as, skip_serializing_none, DeserializeFromStr, SerializeDisplay};
 use std::{net::IpAddr, str::FromStr};
+use strum_macros::{Display, EnumString};
 
 #[skip_serializing_none]
 #[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
@@ -46,6 +47,7 @@ pub struct Interface {
     pub infiniband_child: Option<InfinibandChild>,
     pub tun: Option<Tun>,
     pub tap: Option<Tap>,
+    pub control: Control,
 }
 
 #[skip_serializing_none]
@@ -159,6 +161,35 @@ pub struct Nexthop {
     pub gateway: String,
 }
 
+#[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
+pub struct Control {
+    #[serde(default)]
+    pub mode: ControlMode,
+}
+
+#[derive(
+    Debug, PartialEq, Default, SerializeDisplay, DeserializeFromStr, EnumString, Clone, Display,
+)]
+#[strum(serialize_all = "snake_case")]
+pub enum ControlMode {
+    #[default]
+    Manual,
+    Off,
+    Boot,
+    Hotplug,
+}
+
+impl From<ControlMode> for bool {
+    fn from(value: ControlMode) -> Self {
+        match value {
+            ControlMode::Manual => false,
+            ControlMode::Off => false,
+            ControlMode::Boot => true,
+            ControlMode::Hotplug => true,
+        }
+    }
+}
+
 pub struct ConnectionResult {
     pub connections: Vec<model::Connection>,
     pub warnings: Vec<anyhow::Error>,
@@ -181,6 +212,7 @@ impl Interface {
             ip_config: ip_config.ip_config,
             status: Status::Down,
             mtu: self.link.mtu.unwrap_or_default(),
+            autoconnect: self.control.mode.clone().into(),
             ..Default::default()
         };
         let mut connections: Vec<model::Connection> = vec![];
@@ -512,5 +544,18 @@ mod tests {
 
         let con: model::Connection = ifc.to_connection().unwrap().connections[0].to_owned();
         assert_eq!(con.firewall_zone, Some("topsecret".to_string()));
+    }
+
+    #[test]
+    fn test_startmode_to_connection() {
+        setup_default_migration_settings();
+        let mut ifc = Interface::default();
+
+        let con: model::Connection = ifc.to_connection().unwrap().connections[0].to_owned();
+        assert_eq!(con.autoconnect, false);
+
+        ifc.control.mode = ControlMode::Boot;
+        let con: model::Connection = ifc.to_connection().unwrap().connections[0].to_owned();
+        assert_eq!(con.autoconnect, true);
     }
 }

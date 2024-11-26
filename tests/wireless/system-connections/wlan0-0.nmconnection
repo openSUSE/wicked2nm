@@ -2,6 +2,7 @@
 id=wlan0-0
 uuid=2a262d6e-ccba-4afb-a190-ec08d0175c56
 type=wifi
+autoconnect=false
 interface-name=wlan0
 
 [wifi]
