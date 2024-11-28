@@ -78,7 +78,7 @@
 <interface origin="compat:suse:/etc/sysconfig/network/ifcfg-wlan2">
   <name>wlan2</name>
   <control>
-    <mode>auto</mode>
+    <mode>boot</mode>
   </control>
   <firewall/>
   <wireless>
