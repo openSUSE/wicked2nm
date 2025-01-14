@@ -1,5 +1,5 @@
 [package]
-name = "migrate-wicked"
+name = "wicked2nm"
 version = "0.1.0"
 edition = "2021"
 
@@ -29,5 +29,5 @@ dotenv = "0.15.0"
 serde_path_to_error = "0.1.16"
 
 [[bin]]
-name = "migrate-wicked"
+name = "wicked2nm"
 path = "src/main.rs"

@@ -4,7 +4,7 @@ GREEN='\033[0;32m'
 BOLD='\033[1m'
 NC='\033[0m'
 FAILED_TESTS=()
-MIGRATE_WICKED_BIN=../target/debug/migrate-wicked
+MIGRATE_WICKED_BIN=../target/debug/wicked2nm
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 cd $SCRIPT_DIR
 TEST_DIRS=${TEST_DIRS:-$(ls -d */ | sed 's#/##')}
@@ -100,7 +100,7 @@ if [[ $(ls -A /etc/NetworkManager/system-connections/) ]]; then
 fi
 
 if [ ! -f $MIGRATE_WICKED_BIN ]; then
-    echo -e "${RED}No migrate-wicked binary found${NC}"
+    echo -e "${RED}No wicked2nm binary found${NC}"
     exit 1
 fi
 

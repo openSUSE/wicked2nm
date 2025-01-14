@@ -23,7 +23,7 @@ use crate::interface::Interface;
 use crate::netconfig::Netconfig;
 
 #[derive(Parser)]
-#[command(name = "migrate-wicked", version(concat!(env!("CARGO_PKG_VERSION"),"~",env!("GIT_HEAD"))), about, long_about = None)]
+#[command(name = "wicked2nm", version(concat!(env!("CARGO_PKG_VERSION"),"~",env!("GIT_HEAD"))), about, long_about = None)]
 struct Cli {
     #[clap(flatten)]
     global_opts: GlobalOpts,
@@ -37,10 +37,10 @@ struct GlobalOpts {
     #[arg(long, global = true, default_value_t = LevelFilter::Info, value_parser = clap::builder::PossibleValuesParser::new(["TRACE", "DEBUG", "INFO", "WARN", "ERROR"]).map(|s| s.parse::<LevelFilter>().unwrap()),)]
     pub log_level: LevelFilter,
 
-    #[arg(long, global = true, env = "MIGRATE_WICKED_WITHOUT_NETCONFIG")]
+    #[arg(long, global = true, env = "W2NM_WITHOUT_NETCONFIG")]
     pub without_netconfig: bool,
 
-    #[arg(long, global = true, default_value_t = String::from("/etc/sysconfig/network/config"), env = "MIGRATE_WICKED_NETCONFIG_PATH")]
+    #[arg(long, global = true, default_value_t = String::from("/etc/sysconfig/network/config"), env = "W2NM_NETCONFIG_PATH")]
     pub netconfig_path: String,
 }
 
@@ -63,15 +63,15 @@ pub enum Commands {
         paths: Vec<String>,
 
         /// Continue migration if warnings are encountered
-        #[arg(short, long, global = true, env = "MIGRATE_WICKED_CONTINUE_MIGRATION")]
+        #[arg(short, long, global = true, env = "W2NM_CONTINUE_MIGRATION")]
         continue_migration: bool,
 
         /// Run migration without sending connections to NetworkManager (can be run without NetworkManager installed)
-        #[arg(long, global = true, env = "MIGRATE_WICKED_DRY_RUN")]
+        #[arg(long, global = true, env = "W2NM_DRY_RUN")]
         dry_run: bool,
 
         /// Activate connections immediately
-        #[arg(long, global = true, env = "MIGRATE_WICKED_ACTIVATE_CONNECTIONS")]
+        #[arg(long, global = true, env = "W2NM_ACTIVATE_CONNECTIONS")]
         activate_connections: bool,
     },
 }
@@ -199,7 +199,7 @@ async fn main() -> CliResult {
 
     let config = ConfigBuilder::new()
         .set_time_level(LevelFilter::Off)
-        .add_filter_allow("migrate_wicked".to_string())
+        .add_filter_allow("wicked2nm".to_string())
         .build();
 
     simplelog::TermLogger::init(

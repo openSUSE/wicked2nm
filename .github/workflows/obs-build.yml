@@ -3,12 +3,12 @@ name: Update OBS Git Package
 on:
   push:
     branches:
-      - split_migration
+      - master
 
 jobs:
   update_obs_package:
     # do not run in forks
-    if: github.repository == 'jcronenberg/agama'
+    if: github.repository == 'jcronenberg/wicked2nm'
 
     runs-on: ubuntu-latest
 
@@ -40,20 +40,20 @@ jobs:
           OBS_PASSWORD: ${{ secrets.OBS_PW }}
 
       - name: Checkout package
-        run: osc checkout home:jcronenberg:migrate-wicked/migrate-wicked-git -o migrate-wicked-git-package
+        run: osc checkout home:jcronenberg:migrate-wicked/wicked2nm -o wicked2nm-package
 
       - name: Remove current obscpio
         run: rm -f *.obscpio
-        working-directory: ./migrate-wicked-git-package
+        working-directory: ./wicked2nm-package
 
       - name: Run osc service manualrun
         run: osc service manualrun
-        working-directory: ./migrate-wicked-git-package
+        working-directory: ./wicked2nm-package
 
       - name: Update current files in osc
         run: osc ar
-        working-directory: ./migrate-wicked-git-package
+        working-directory: ./wicked2nm-package
 
       - name: Commit to OBS
         run: osc commit -m "$GITHUB_SHA"
-        working-directory: ./migrate-wicked-git-package
+        working-directory: ./wicked2nm-package
