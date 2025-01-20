@@ -327,7 +327,12 @@ impl Interface {
         if let Some(ipv4_static) = &self.ipv4_static {
             if let Some(addresses_in) = &ipv4_static.addresses {
                 for addr in addresses_in {
-                    addresses.push(IpInet::from_str(addr.local.as_str()).unwrap());
+                    addresses.push(match IpInet::from_str(addr.local.as_str()) {
+                        Ok(address) => address,
+                        Err(e) => {
+                            anyhow::bail!("Failed to parse address \"{}\": {}", addr.local, e)
+                        }
+                    });
                 }
             }
             if let Some(routes) = &ipv4_static.routes {
@@ -345,7 +350,12 @@ impl Interface {
         if let Some(ipv6_static) = &self.ipv6_static {
             if let Some(addresses_in) = &ipv6_static.addresses {
                 for addr in addresses_in {
-                    addresses.push(IpInet::from_str(addr.local.as_str()).unwrap());
+                    addresses.push(match IpInet::from_str(addr.local.as_str()) {
+                        Ok(address) => address,
+                        Err(e) => {
+                            anyhow::bail!("Failed to parse address \"{}\": {}", addr.local, e)
+                        }
+                    });
                 }
             }
             if let Some(routes) = &ipv6_static.routes {
