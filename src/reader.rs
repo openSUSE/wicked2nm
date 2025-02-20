@@ -105,10 +105,14 @@ pub fn read(paths: Vec<String>) -> Result<InterfacesResult, anyhow::Error> {
         match read_netconfig(settings.netconfig_path.clone()) {
             Ok(netconfig) => result.netconfig = netconfig,
             Err(e) => {
+                let msg = format!(
+                    "Failed to read netconfig at {}: {}",
+                    settings.netconfig_path, e
+                );
                 if !settings.continue_migration {
-                    return Err(e);
+                    anyhow::bail!(msg);
                 };
-                log::warn!("Failed to read netconfig: {}", e);
+                log::warn!("{}", msg);
             }
         };
     }
