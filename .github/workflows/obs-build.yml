@@ -8,7 +8,7 @@ on:
 jobs:
   update_obs_package:
     # do not run in forks
-    if: github.repository == 'jcronenberg/wicked2nm'
+    if: github.repository == 'openSUSE/wicked2nm'
 
     runs-on: ubuntu-latest
 
