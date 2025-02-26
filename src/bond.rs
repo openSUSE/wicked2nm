@@ -58,7 +58,7 @@ pub enum WickedBondMode {
     ActiveBackup,
     BalanceXor,
     Broadcast,
-    #[strum(serialize = "802.3ad")]
+    #[strum(serialize = "ieee802-3ad")]
     IEEE8023ad,
     BalanceTlb,
     BalanceAlb,
