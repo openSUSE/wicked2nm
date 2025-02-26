@@ -71,8 +71,6 @@ pub struct Bond {
     pub mode: WickedBondMode,
     pub miimon: Option<Miimon>,
     pub arpmon: Option<ArpMon>,
-    #[serde(deserialize_with = "unwrap_slaves")]
-    pub slaves: Vec<Slave>,
     /* only on mode=[802.3ad, balance_xor] */
     pub xmit_hash_policy: Option<XmitHashPolicy>,
     /* only on mode=balance_rr */
@@ -101,28 +99,12 @@ pub struct Bond {
     pub num_unsol_na: Option<u32>,
     /* only on mode=[balance_tlb|balance_alb] */
     pub lp_interval: Option<u32>,
+    /* only on mode=[active-backup|balance_tlb|balance_alb] */
+    pub primary: Option<String>,
     /* only on mode=[balance_tlb|balance_alb|balance_RR|active-backup] */
     pub resend_igmp: Option<u32>,
     pub all_slaves_active: Option<bool>,
     pub address: Option<String>,
-}
-
-impl Bond {
-    pub fn primary(self: &Bond) -> Option<&String> {
-        for s in self.slaves.iter() {
-            if s.primary.unwrap_or(false) {
-                return Some(&s.device);
-            }
-        }
-        None
-    }
-}
-
-#[skip_serializing_none]
-#[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
-pub struct Slave {
-    pub device: String,
-    pub primary: Option<bool>,
 }
 
 #[derive(Debug, PartialEq, Default, SerializeDisplay, DeserializeFromStr, EnumString, Display)]
@@ -184,17 +166,6 @@ where
     Ok(ArpMonTargetAddressV4::deserialize(deserializer)?.ipv4_address)
 }
 
-fn unwrap_slaves<'de, D>(deserializer: D) -> Result<Vec<Slave>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    #[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
-    struct Slaves {
-        slave: Vec<Slave>,
-    }
-    Ok(Slaves::deserialize(deserializer)?.slave)
-}
-
 impl From<&WickedBondMode> for AgamaBondMode {
     fn from(bondmode: &WickedBondMode) -> AgamaBondMode {
         match bondmode {
@@ -213,7 +184,7 @@ impl From<&Bond> for model::ConnectionConfig {
     fn from(bond: &Bond) -> model::ConnectionConfig {
         let mut h: HashMap<String, String> = HashMap::new();
 
-        if let Some(p) = bond.primary() {
+        if let Some(p) = &bond.primary {
             h.insert(String::from("primary"), p.clone());
         }
 
@@ -366,8 +337,8 @@ mod tests {
                     validate_targets: Some(ArpValidateTargets::Any),
                     targets: vec![String::from("1.2.3.4"), String::from("4.3.2.1")],
                 }),
-                slaves: vec![],
                 address: Some(String::from("02:11:22:33:44:55")),
+                primary: Some(String::from("en0")),
             }),
             ..Default::default()
         };
@@ -409,6 +380,7 @@ mod tests {
                 ("arp_all_targets", String::from("any")),
                 ("arp_ip_target", String::from("1.2.3.4,4.3.2.1")),
                 ("arp_interval", 23.to_string()),
+                ("primary", String::from("en0")),
             ]);
 
             for (k, v) in s.iter() {
