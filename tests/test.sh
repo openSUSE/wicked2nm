@@ -65,6 +65,14 @@ while [[ $# -gt 0 ]]; do
       NO_WICKED=1; shift
       ;;
     --nm-cleanup)
+      connections=$(ls /etc/NetworkManager/system-connections/ | sed 's/\.nmconnection//')
+      if [ ! -z "${connections}" ]; then
+          echo -e "The following connections will be deleted:\n$connections"
+      	  read -p "Do you want to continue? [y/N] " continue_cleanup
+      	  if [ "$continue_cleanup" != "y" ]; then
+      	      exit 1
+      	  fi
+      fi
       nm_cleanup
       ;;
     --no-cleanup)
