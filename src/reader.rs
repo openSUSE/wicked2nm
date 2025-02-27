@@ -188,9 +188,6 @@ mod tests {
                     <lp-interval>19</lp-interval>
                     <resend-igmp>23</resend-igmp>
                     <all-slaves-active>true</all-slaves-active>
-                    <slaves>
-                        <slave><device>en0</device></slave>
-                    </slaves>
                     <miimon>
                         <frequency>23</frequency>
                         <updelay>27</updelay>
@@ -207,6 +204,7 @@ mod tests {
                         </targets>
                     </arpmon>
                     <address>02:11:22:33:44:55</address>
+                    <primary>en0</primary>
                 </bond>
             </interface>
             "##;
@@ -238,10 +236,6 @@ mod tests {
                 lp_interval: Some(19),
                 resend_igmp: Some(23),
                 all_slaves_active: Some(true),
-                slaves: vec![Slave {
-                    device: String::from("en0"),
-                    primary: None
-                }],
                 miimon: Some(Miimon {
                     frequency: 23,
                     carrier_detect: CarrierDetect::Ioctl,
@@ -255,6 +249,7 @@ mod tests {
                     targets: vec![String::from("1.2.3.4"), String::from("4.3.2.1")]
                 }),
                 address: Some(String::from("02:11:22:33:44:55")),
+                primary: Some(String::from("en0")),
             }
         );
     }
