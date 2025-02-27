@@ -9,6 +9,7 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 cd $SCRIPT_DIR
 TEST_DIRS=${TEST_DIRS:-$(ls -d */ | sed 's#/##')}
 NO_CLEANUP=${NO_CLEANUP:-0}
+NO_WICKED=${NO_WICKED:-0}
 LOG_LEVEL=1
 TEST_STDIN=true
 
@@ -41,6 +42,7 @@ print_help()
   echo "  -q|--quiet              Be less verbose"
   echo "  --nm-cleanup            Cleanup current NetworkManager config before start"
   echo "  --no-cleanup            Do not cleanup NetworkManger after test"
+  echo "  --no-wicked             If set, ifcfg tests do not fail when wicked isn't available"
   echo "  -h|--help               Print this help"
 }
 
@@ -58,6 +60,9 @@ while [[ $# -gt 0 ]]; do
       ;;
     --binary)
       MIGRATE_WICKED_BIN=$1; shift
+      ;;
+    --no-wicked)
+      NO_WICKED=1; shift
       ;;
     --nm-cleanup)
       nm_cleanup
@@ -123,6 +128,31 @@ for test_dir in ${TEST_DIRS}; do
     else
         migrate_args+=" --without-netconfig"
         show_args+=" --without-netconfig"
+    fi
+
+    if ls -1 $test_dir/netconfig/ifcfg-* >/dev/null 2>&1 && [ $NO_WICKED -eq 0 ]; then
+        err_log="$test_dir/wicked_show_config_error.log"
+        cfg_out="$test_dir/wicked_xml/config.xml"
+        if ! command -v wicked ; then
+            error_msg "$test_dir" "missing wicked executable"
+            FAILED_TESTS+=("${test_dir}::wicked-show-config")
+            continue
+        fi
+
+        wicked show-config --ifconfig compat:$test_dir/netconfig \
+            > "$cfg_out" \
+            2> "$err_log"
+
+        if [ $? -ne 0 ] || [ -s "$err_log" ]; then
+            err_msg="'wicked show-config' failed"
+            [ -s "$err_log" ] && err_msg+=" see $err_log"
+
+            error_msg "$test_dir" "$err_msg"
+            FAILED_TESTS+=("${test_dir}::wicked-show-config")
+            continue
+        fi
+
+        sed -i -E 's/[^:]+(\/tests\/'"$test_dir"')/\1/' "$cfg_out"
     fi
 
     log_verbose "RUN: $MIGRATE_WICKED_BIN show $show_args $test_dir/wicked_xml"
