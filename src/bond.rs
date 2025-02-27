@@ -180,6 +180,18 @@ impl From<&WickedBondMode> for AgamaBondMode {
     }
 }
 
+impl XmitHashPolicy {
+    fn to_agama(&self) -> String {
+        match self {
+            XmitHashPolicy::Layer2 => String::from("layer2"),
+            XmitHashPolicy::Layer23 => String::from("layer2+3"),
+            XmitHashPolicy::Layer34 => String::from("layer3+4"),
+            XmitHashPolicy::Encap23 => String::from("encap2+3"),
+            XmitHashPolicy::Encap34 => String::from("encap3+4"),
+        }
+    }
+}
+
 impl From<&Bond> for model::ConnectionConfig {
     fn from(bond: &Bond) -> model::ConnectionConfig {
         let mut h: HashMap<String, String> = HashMap::new();
@@ -230,7 +242,7 @@ impl From<&Bond> for model::ConnectionConfig {
         }
 
         if let Some(v) = &bond.xmit_hash_policy {
-            h.insert(String::from("xmit_hash_policy"), v.to_string());
+            h.insert(String::from("xmit_hash_policy"), v.to_agama());
         }
 
         if let Some(v) = &bond.packets_per_slave {
@@ -354,7 +366,7 @@ mod tests {
         if let model::ConnectionConfig::Bond(bond) = &connection.config {
             assert_eq!(bond.mode, AgamaBondMode::LACP);
             let s = HashMap::from([
-                ("xmit_hash_policy", String::from("encap34")),
+                ("xmit_hash_policy", String::from("encap3+4")),
                 ("packets_per_slave", 23.to_string()),
                 ("tlb_dynamic_lb", 1.to_string()),
                 ("lacp_rate", String::from("slow")),
