@@ -30,8 +30,18 @@ jobs:
     - name: Install tarpaulin
       run: cargo-binstall --no-confirm cargo-tarpaulin
 
+    - uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: rust-checks-tarpaulin-${{ hashFiles('Cargo.lock') }}
+
     - name: Unit tests
-      run: cargo tarpaulin --color always --out xml
+      run: cargo tarpaulin --color always --skip-clean --target-dir target/tarpaulin --out xml
 
     - name: Lint tests
       run: cargo fmt --all -- --check
