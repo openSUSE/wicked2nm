@@ -63,6 +63,24 @@ pub struct Firewall {
 pub struct Link {
     pub master: Option<String>,
     pub mtu: Option<u32>,
+    pub port: Option<LinkPort>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct LinkPort {
+    #[serde(rename = "@type")]
+    pub port_type: LinkPortType,
+    pub priority: Option<u32>,
+    pub path_cost: Option<u32>,
+}
+
+#[derive(Debug, PartialEq, SerializeDisplay, DeserializeFromStr, EnumString, Display)]
+#[strum(serialize_all = "lowercase")]
+pub enum LinkPortType {
+    Bridge,
+    Bond,
 }
 
 fn default_true() -> bool {
@@ -205,6 +223,18 @@ pub struct IpConfigResult {
     warnings: Vec<anyhow::Error>,
 }
 
+impl From<&LinkPort> for model::PortConfig {
+    fn from(port: &LinkPort) -> Self {
+        match port.port_type {
+            LinkPortType::Bridge => model::PortConfig::Bridge(model::BridgePortConfig {
+                priority: port.priority,
+                path_cost: port.path_cost,
+            }),
+            LinkPortType::Bond => model::PortConfig::None,
+        }
+    }
+}
+
 impl Interface {
     pub fn to_connection(&self) -> Result<ConnectionResult, anyhow::Error> {
         let settings = MIGRATION_SETTINGS.get().unwrap();
@@ -220,6 +250,11 @@ impl Interface {
             autoconnect: self.control.mode.clone().into(),
             ..Default::default()
         };
+
+        if let Some(port) = &self.link.port {
+            connection.port_config = port.into();
+        }
+
         let mut connections: Vec<model::Connection> = vec![];
 
         if settings.activate_connections {

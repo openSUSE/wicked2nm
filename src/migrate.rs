@@ -1,4 +1,3 @@
-use crate::bridge::BridgePort;
 use crate::interface::Interface;
 use crate::netconfig::Netconfig;
 use crate::MIGRATION_SETTINGS;
@@ -47,37 +46,6 @@ fn update_parent_connection(
     Ok(())
 }
 
-fn update_bridge_ports(
-    connections: &mut [Connection],
-    portconfigs: HashMap<String, BridgePort>,
-) -> Result<(), anyhow::Error> {
-    let settings = MIGRATION_SETTINGS.get().unwrap();
-
-    for (ifc, portconfig) in portconfigs {
-        let id;
-        if let Some(c) = connections
-            .iter()
-            .find(|c| c.interface.as_deref() == Some(&ifc))
-        {
-            id = c.id.clone();
-        } else {
-            log::warn!("Missing bridge port {} connection", ifc);
-            if !settings.continue_migration {
-                return Err(anyhow::anyhow!(
-                    "Migration failed, because bridge is missing port {}",
-                    ifc
-                ));
-            }
-            continue;
-        }
-
-        let c = connections.iter_mut().find(|c| c.id == id).unwrap();
-        c.port_config = (&portconfig).into();
-    }
-
-    Ok(())
-}
-
 fn create_lo_connection() -> Connection {
     Connection {
         id: "lo".to_string(),
@@ -103,7 +71,6 @@ pub async fn migrate(
 ) -> Result<(), Box<dyn Error>> {
     let settings = MIGRATION_SETTINGS.get().unwrap();
     let mut parents: HashMap<String, String> = HashMap::new();
-    let mut bridge_ports: HashMap<String, BridgePort> = HashMap::new();
     let mut connections: Vec<Connection> = vec![];
 
     for interface in interfaces {
@@ -126,16 +93,10 @@ pub async fn migrate(
                 parents.insert(connection.id.clone(), parent.clone());
             }
             connections.push(connection);
-            if let Some(bridge) = &interface.bridge {
-                for port in &bridge.ports {
-                    bridge_ports.insert(port.device.clone(), port.clone());
-                }
-            }
         }
     }
 
     update_parent_connection(&mut connections, parents)?;
-    update_bridge_ports(&mut connections, bridge_ports)?;
 
     let mut state = NetworkState::new(GeneralState::default(), vec![], vec![], vec![]);
     for connection in &connections {
