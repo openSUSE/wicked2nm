@@ -1,0 +1,13 @@
+[connection]
+id=eth1
+uuid=faea58e2-d243-4a36-a40d-897c3741e7c9
+type=ethernet
+controller=br99
+interface-name=eth1
+port-type=bridge
+
+[ethernet]
+
+[bridge-port]
+
+[match]
