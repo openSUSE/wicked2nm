@@ -1,35 +1,3 @@
-<interface origin="compat:suse:/etc/sysconfig/network/ifcfg-en0">
-  <name>en0</name>
-  <control>
-    <mode>boot</mode>
-  </control>
-  <firewall/>
-  <link>
-    <master>br0</master>
-  </link>
-  <ipv4>
-    <enabled>false</enabled>
-  </ipv4>
-  <ipv6>
-    <enabled>false</enabled>
-  </ipv6>
-</interface>
-<interface origin="compat:suse:/etc/sysconfig/network/ifcfg-en1">
-  <name>en1</name>
-  <control>
-    <mode>boot</mode>
-  </control>
-  <firewall/>
-  <link>
-    <master>br0</master>
-  </link>
-  <ipv4>
-    <enabled>false</enabled>
-  </ipv4>
-  <ipv6>
-    <enabled>false</enabled>
-  </ipv6>
-</interface>
 <interface origin="compat:suse:/etc/sysconfig/network/ifcfg-br0">
   <name>br0</name>
   <control>
@@ -69,6 +37,38 @@
     <enabled>true</enabled>
     <privacy>prefer-public</privacy>
     <accept-redirects>false</accept-redirects>
+  </ipv6>
+</interface>
+<interface origin="compat:suse:/etc/sysconfig/network/ifcfg-en0">
+  <name>en0</name>
+  <control>
+    <mode>boot</mode>
+  </control>
+  <firewall/>
+  <link>
+    <master>br0</master>
+  </link>
+  <ipv4>
+    <enabled>false</enabled>
+  </ipv4>
+  <ipv6>
+    <enabled>false</enabled>
+  </ipv6>
+</interface>
+<interface origin="compat:suse:/etc/sysconfig/network/ifcfg-en1">
+  <name>en1</name>
+  <control>
+    <mode>boot</mode>
+  </control>
+  <firewall/>
+  <link>
+    <master>br0</master>
+  </link>
+  <ipv4>
+    <enabled>false</enabled>
+  </ipv4>
+  <ipv6>
+    <enabled>false</enabled>
   </ipv6>
 </interface>
 
