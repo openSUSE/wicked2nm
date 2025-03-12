@@ -1,9 +1,8 @@
-<interface origin="compat:suse:/etc/sysconfig/network/ifcfg-br0">
+<interface origin="compat:suse:/tests/bridge1/netconfig/ifcfg-br0">
   <name>br0</name>
   <control>
     <mode>boot</mode>
   </control>
-  <firewall/>
   <bridge>
     <stp>false</stp>
     <priority>5</priority>
@@ -11,17 +10,6 @@
     <aging-time>1.20</aging-time>
     <hello-time>1.10</hello-time>
     <max-age>40.30</max-age>
-    <ports>
-      <port>
-        <device>en0</device>
-        <priority>9</priority>
-        <path-cost>2</path-cost>
-      </port>
-      <port>
-        <device>en1</device>
-        <priority>0</priority>
-      </port>
-    </ports>
   </bridge>
   <link/>
   <ipv4>
@@ -36,17 +24,19 @@
   <ipv6>
     <enabled>true</enabled>
     <privacy>prefer-public</privacy>
-    <accept-redirects>false</accept-redirects>
   </ipv6>
 </interface>
-<interface origin="compat:suse:/etc/sysconfig/network/ifcfg-en0">
+<interface origin="compat:suse:/tests/bridge1/netconfig/ifcfg-br0">
   <name>en0</name>
   <control>
-    <mode>boot</mode>
+    <mode>hotplug</mode>
   </control>
-  <firewall/>
   <link>
     <master>br0</master>
+    <port type="bridge">
+      <priority>9</priority>
+      <path-cost>2</path-cost>
+    </port>
   </link>
   <ipv4>
     <enabled>false</enabled>
@@ -55,14 +45,16 @@
     <enabled>false</enabled>
   </ipv6>
 </interface>
-<interface origin="compat:suse:/etc/sysconfig/network/ifcfg-en1">
+<interface origin="compat:suse:/tests/bridge1/netconfig/ifcfg-br0">
   <name>en1</name>
   <control>
-    <mode>boot</mode>
+    <mode>hotplug</mode>
   </control>
-  <firewall/>
   <link>
     <master>br0</master>
+    <port type="bridge">
+      <priority>0</priority>
+    </port>
   </link>
   <ipv4>
     <enabled>false</enabled>
@@ -71,4 +63,3 @@
     <enabled>false</enabled>
   </ipv6>
 </interface>
-
