@@ -180,20 +180,22 @@ for test_dir in ${TEST_DIRS}; do
         echo -e "${GREEN}Migration for $test_dir failed as expected${NC}"
     fi
 
-    for cmp_file in $(ls -1 $test_dir/system-connections/); do
-        a="$test_dir/system-connections/$cmp_file"
-        b="/etc/NetworkManager/system-connections/${cmp_file}"
-        diff_cmd="diff --unified=0 --color=always -I uuid -I timestamp $a $b" 
-        log_verbose "RUN: $diff_cmd"
-        if $diff_cmd; then
-            echo -e "${GREEN}Migration for connection ${cmp_file/\.nmconnection/} successful${NC}"
-        else
-            diff_cmd="diff  -I uuid -I timestamp -y --color=always $a $b"
-            log_verbose "RUN: $diff_cmd\n$($diff_cmd)\n" 
-            error_msg ${test_dir} "$cmp_file didn't match"
-            FAILED_TESTS+=("${test_dir}::compare_config::${cmp_file}")
-        fi
-    done
+    if [ -d "$test_dir/system-connections" ]; then
+      for cmp_file in $(ls -1 $test_dir/system-connections/); do
+          a="$test_dir/system-connections/$cmp_file"
+          b="/etc/NetworkManager/system-connections/${cmp_file}"
+          diff_cmd="diff --unified=0 --color=always -I uuid -I timestamp $a $b" 
+          log_verbose "RUN: $diff_cmd"
+          if $diff_cmd; then
+              echo -e "${GREEN}Migration for connection ${cmp_file/\.nmconnection/} successful${NC}"
+          else
+              diff_cmd="diff  -I uuid -I timestamp -y --color=always $a $b"
+              log_verbose "RUN: $diff_cmd\n$($diff_cmd)\n" 
+              error_msg ${test_dir} "$cmp_file didn't match"
+              FAILED_TESTS+=("${test_dir}::compare_config::${cmp_file}")
+          fi
+      done
+    fi
 
     [ "$NO_CLEANUP" -gt 0 ] || nm_cleanup
 done

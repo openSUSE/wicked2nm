@@ -5,11 +5,6 @@ use serde_with::{skip_serializing_none, DeserializeFromStr, SerializeDisplay};
 use std::collections::HashMap;
 use strum_macros::{Display, EnumString};
 
-#[derive(Debug, PartialEq, Serialize, Clone, Deserialize)]
-pub enum ParentKind {
-    Bond,
-}
-
 #[derive(Debug, PartialEq, SerializeDisplay, DeserializeFromStr, EnumString, Display)]
 #[strum(serialize_all = "kebab_case")]
 pub enum FailOverMac {
