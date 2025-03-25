@@ -1,9 +1,9 @@
 [connection]
-id=eth1
-uuid=faea58e2-d243-4a36-a40d-897c3741e7c9
+id=eth8
+uuid=18cb882a-33ef-49ac-a9dd-151a9e014fb1
 type=ethernet
 controller=br99
-interface-name=eth1
+interface-name=eth8
 port-type=bridge
 
 [ethernet]
