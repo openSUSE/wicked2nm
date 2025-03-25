@@ -28,7 +28,7 @@
   </ipv6:static>
 </interface>
 <interface origin="compat:suse:/tests/bridge2/netconfig/ifcfg-br99">
-  <name>eth0</name>
+  <name>eth8</name>
   <control>
     <mode>hotplug</mode>
   </control>
@@ -44,7 +44,7 @@
   </ipv6>
 </interface>
 <interface origin="compat:suse:/tests/bridge2/netconfig/ifcfg-br99">
-  <name>eth1</name>
+  <name>eth9</name>
   <control>
     <mode>hotplug</mode>
   </control>
