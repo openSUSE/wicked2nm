@@ -7,7 +7,10 @@ use crate::vlan::Vlan;
 use crate::wireless::Wireless;
 use crate::MIGRATION_SETTINGS;
 use agama_lib::network::types::Status;
-use agama_server::network::model::{self, IpConfig, IpRoute, Ipv4Method, Ipv6Method, MacAddress};
+use agama_server::network::model::{
+    self, Dhcp4Settings, Dhcp6Settings, IpConfig, IpRoute, Ipv4Method, Ipv6Method, MacAddress,
+};
+use anyhow::anyhow;
 use cidr::IpInet;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, skip_serializing_none, DeserializeFromStr, SerializeDisplay};
@@ -103,11 +106,26 @@ impl Default for Ipv4 {
 pub struct Ipv6 {
     #[serde(default = "default_true")]
     pub enabled: bool,
+    pub privacy: Option<Ip6Privacy>,
+}
+
+#[derive(
+    Debug, PartialEq, Default, SerializeDisplay, DeserializeFromStr, EnumString, Clone, Display,
+)]
+#[strum(serialize_all = "kebab-case")]
+pub enum Ip6Privacy {
+    Disable = 0,
+    #[default]
+    PreferPublic = 1,
+    PreferTemporary = 2,
 }
 
 impl Default for Ipv6 {
     fn default() -> Self {
-        Self { enabled: true }
+        Self {
+            enabled: true,
+            privacy: None,
+        }
     }
 }
 
@@ -123,8 +141,20 @@ pub struct Ipv4Static {
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Ipv4Dhcp {
     pub enabled: bool,
+    pub hostname: Option<String>,
+    #[serde(rename = "release-lease", default)]
+    pub release_lease: bool,
 }
 
+impl Default for Ipv4Dhcp {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            hostname: None,
+            release_lease: false,
+        }
+    }
+}
 #[skip_serializing_none]
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Ipv6Static {
@@ -141,13 +171,27 @@ pub struct Address {
 }
 
 #[serde_as]
-#[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Ipv6Dhcp {
     pub enabled: bool,
     pub mode: String,
+    pub hostname: Option<String>,
+    #[serde(rename = "release-lease", default)]
+    pub release_lease: bool,
 }
 
+
+impl Default for Ipv6Dhcp {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            mode: String::from("auto"),
+            hostname: None,
+            release_lease: false,
+        }
+    }
+}
 #[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Ipv6Auto {
@@ -406,12 +450,47 @@ impl Interface {
             }
         }
 
+        let mut dhcp4_settings: Option<Dhcp4Settings> = None;
+        if let Some(ipv4_dhcp) = &self.ipv4_dhcp {
+            let mut dhcp_settings = Dhcp4Settings::default();
+            if let Some(hostname) = &ipv4_dhcp.hostname {
+                dhcp_settings.send_hostname = true;
+                dhcp_settings.hostname = Some(hostname.clone());
+            } else {
+                dhcp_settings.send_hostname = false;
+            }
+            dhcp_settings.send_release = Some(ipv4_dhcp.release_lease);
+            dhcp4_settings = Some(dhcp_settings);
+        }
+
+        let mut dhcp6_settings: Option<Dhcp6Settings> = None;
+        if let Some(ipv6_dhcp) = &self.ipv6_dhcp {
+            let mut dhcp_settings = Dhcp6Settings::default();
+            if let Some(hostname) = &ipv6_dhcp.hostname {
+                dhcp_settings.send_hostname = true;
+                // The problem here is if it's just the default hostname it shouldn't be hardcoded here...
+                dhcp_settings.hostname = Some(hostname.clone());
+            } else {
+                dhcp_settings.send_hostname = false;
+            }
+            dhcp_settings.send_release = Some(ipv6_dhcp.release_lease);
+            dhcp6_settings = Some(dhcp_settings);
+        }
+
+        let mut ip6_privacy: Option<i32> = None;
+        if let Some(privacy) = &self.ipv6.privacy {
+            ip6_privacy = Some(privacy.clone() as i32);
+        }
+
         connection_result.ip_config = IpConfig {
             addresses,
             method4,
             method6,
             routes4,
             routes6,
+            dhcp4_settings,
+            dhcp6_settings,
+            ip6_privacy,
             ..Default::default()
         };
         Ok(connection_result)
@@ -466,7 +545,7 @@ mod tests {
     fn test_static_interface_to_connection() {
         setup_default_migration_settings();
         let static_interface = Interface {
-            ipv4: Ipv4 { enabled: true },
+            ipv4: Ipv4::default(),
             ipv4_static: Some(Ipv4Static {
                 addresses: Some(vec![Address {
                     local: "127.0.0.1/8".to_string(),
@@ -478,7 +557,7 @@ mod tests {
                     ..Default::default()
                 }]),
             }),
-            ipv6: Ipv6 { enabled: true },
+            ipv6: Ipv6::default(),
             ipv6_static: Some(Ipv6Static {
                 addresses: Some(vec![Address {
                     local: "::1/128".to_string(),
@@ -542,7 +621,10 @@ mod tests {
     fn test_dhcp_interface_to_connection() {
         setup_default_migration_settings();
         let static_interface = Interface {
-            ipv4_dhcp: Some(Ipv4Dhcp { enabled: true }),
+            ipv4_dhcp: Some(Ipv4Dhcp {
+                enabled: true,
+                ..Default::default()
+            }),
             ..Default::default()
         };
 
