@@ -4,9 +4,9 @@ GREEN='\033[0;32m'
 BOLD='\033[1m'
 NC='\033[0m'
 FAILED_TESTS=()
-MIGRATE_WICKED_BIN=../target/debug/wicked2nm
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 cd $SCRIPT_DIR
+MIGRATE_WICKED_BIN="$SCRIPT_DIR/../target/debug/wicked2nm"
 TEST_DIRS=${TEST_DIRS:-$(ls -d */ | sed 's#/##')}
 NO_CLEANUP=${NO_CLEANUP:-0}
 NO_WICKED=${NO_WICKED:-0}
@@ -120,34 +120,28 @@ fi
 for test_dir in ${TEST_DIRS}; do
     echo -e "${BOLD}Testing ${test_dir}${NC}"
 
-    migrate_args=""
-    show_args=""
+    cd $SCRIPT_DIR/$test_dir
 
-    if [[ $test_dir == *"failure" ]]; then
-        expect_fail=true
-    else
-        expect_fail=false
-        migrate_args+=" -c"
+    # Apply environment variables of test
+    export W2NM_CONTINUE_MIGRATION=false
+    export W2NM_WITHOUT_NETCONFIG=true
+    export W2NM_NETCONFIG_PATH=
+    TEST_EXPECT_FAIL=false
+    if [ -f  ./ENV ]; then
+       set -a && source ./ENV
+       set +a
     fi
 
-    if [ -d $test_dir/netconfig ]; then
-        migrate_args+=" --netconfig-path $test_dir/netconfig/config"
-        show_args+=" --netconfig-path $test_dir/netconfig/config"
-    else
-        migrate_args+=" --without-netconfig"
-        show_args+=" --without-netconfig"
-    fi
-
-    if ls -1 $test_dir/netconfig/ifcfg-* >/dev/null 2>&1 && [ $NO_WICKED -eq 0 ]; then
-        err_log="$test_dir/wicked_show_config_error.log"
-        cfg_out="$test_dir/wicked_xml/config.xml"
+    if ls -1 ./netconfig/ifcfg-* >/dev/null 2>&1 && [ $NO_WICKED -eq 0 ]; then
+        err_log="./wicked_show_config_error.log"
+        cfg_out="./wicked_xml/config.xml"
         if ! command -v wicked ; then
             error_msg "$test_dir" "missing wicked executable"
             FAILED_TESTS+=("${test_dir}::wicked-show-config")
             continue
         fi
 
-        wicked show-config --ifconfig compat:$test_dir/netconfig \
+        wicked show-config --ifconfig compat:./netconfig \
             > "$cfg_out" \
             2> "$err_log"
 
@@ -160,37 +154,39 @@ for test_dir in ${TEST_DIRS}; do
             continue
         fi
 
-        sed -i -E 's/[^:]+(\/tests\/'"$test_dir"')/\1/' "$cfg_out"
+        # https://unix.stackexchange.com/a/209744
+        regex_esc_test_dir="$(printf '%s' "$test_dir" | sed 's/[.[\(*^$+?{|]/\\&/g')"
+        sed -i -E 's/[^:]+(\/tests\/'"$regex_esc_test_dir"')/\1/' "$cfg_out"
     fi
 
-    log_verbose "RUN: $MIGRATE_WICKED_BIN show $show_args $test_dir/wicked_xml"
-    $MIGRATE_WICKED_BIN show $show_args $test_dir/wicked_xml
-    if [ $? -ne 0 ] && [ "$expect_fail" = false ]; then
+    log_verbose "RUN: $MIGRATE_WICKED_BIN show $test_dir/wicked_xml"
+    $MIGRATE_WICKED_BIN show ./wicked_xml
+    if [ $? -ne 0 ] && [ "$TEST_EXPECT_FAIL" = false ]; then
         error_msg ${test_dir} "show failed"
         FAILED_TESTS+=("${test_dir}::show")
     fi
 
-    log_verbose "RUN: $MIGRATE_WICKED_BIN migrate $migrate_args $test_dir/wicked_xml"
-    $MIGRATE_WICKED_BIN migrate $migrate_args $test_dir/wicked_xml
-    if [ $? -ne 0 ] && [ "$expect_fail" = false ]; then
+    log_verbose "RUN: $MIGRATE_WICKED_BIN migrate $test_dir/wicked_xml"
+    $MIGRATE_WICKED_BIN migrate ./wicked_xml
+    if [ $? -ne 0 ] && [ "$TEST_EXPECT_FAIL" = false ]; then
         error_msg ${test_dir} "migration failed"
         FAILED_TESTS+=("${test_dir}::migrate")
         continue
-    elif [ $? -ne 0 ] && [ "$expect_fail" = true ]; then
+    elif [ $? -ne 0 ] && [ "$TEST_EXPECT_FAIL" = true ]; then
         echo -e "${GREEN}Migration for $test_dir failed as expected${NC}"
     fi
 
-    if [ -d "$test_dir/system-connections" ]; then
-      for cmp_file in $(ls -1 $test_dir/system-connections/); do
-          a="$test_dir/system-connections/$cmp_file"
+    if [ -d "./system-connections" ]; then
+      for cmp_file in $(ls -1 ./system-connections/); do
+          a="./system-connections/$cmp_file"
           b="/etc/NetworkManager/system-connections/${cmp_file}"
-          diff_cmd="diff --unified=0 --color=always -I uuid -I timestamp $a $b" 
+          diff_cmd="diff --unified=0 --color=always -I uuid -I timestamp $a $b"
           log_verbose "RUN: $diff_cmd"
           if $diff_cmd; then
               echo -e "${GREEN}Migration for connection ${cmp_file/\.nmconnection/} successful${NC}"
           else
               diff_cmd="diff  -I uuid -I timestamp -y --color=always $a $b"
-              log_verbose "RUN: $diff_cmd\n$($diff_cmd)\n" 
+              log_verbose "RUN: $diff_cmd\n$($diff_cmd)\n"
               error_msg ${test_dir} "$cmp_file didn't match"
               FAILED_TESTS+=("${test_dir}::compare_config::${cmp_file}")
           fi
