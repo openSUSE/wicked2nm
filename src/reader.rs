@@ -40,7 +40,7 @@ pub fn deserialize_xml(contents: String) -> Result<InterfacesResult, anyhow::Err
                 &mut quick_xml::de::Deserializer::from_str(replaced_string.as_str());
             let res: Result<Vec<Interface>, _> = serde_path_to_error::deserialize(deserializer2);
             if let Err(path_error) = res {
-                log::error!("Error at {}: {}", path_error.path().to_string(), e);
+                log::error!("Error at {}: {}", path_error.path(), e);
             }
             return Err(e.into());
         }
