@@ -136,7 +136,7 @@ for test_dir in ${TEST_DIRS}; do
     if ls -1 ./netconfig/ifcfg-* >/dev/null 2>&1 && [ $NO_WICKED -eq 0 ]; then
         err_log="./wicked_show_config_error.log"
         cfg_out="./wicked_xml/config.xml"
-        if ! command -v wicked ; then
+        if ! command -v wicked >/dev/null ; then
             error_msg "$test_dir" "missing wicked executable"
             FAILED_TESTS+=("${test_dir}::wicked-show-config")
             continue
