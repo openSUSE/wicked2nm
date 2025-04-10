@@ -126,6 +126,7 @@ for test_dir in ${TEST_DIRS}; do
     export W2NM_CONTINUE_MIGRATION=false
     export W2NM_WITHOUT_NETCONFIG=true
     export W2NM_NETCONFIG_PATH=
+    export W2NM_NETCONFIG_DHCP_PATH=
     TEST_EXPECT_FAIL=false
     if [ -f  ./ENV ]; then
        set -a && source ./ENV

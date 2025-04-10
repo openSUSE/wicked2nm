@@ -1,6 +1,7 @@
 use crate::bond::Bond;
 use crate::bridge::Bridge;
 use crate::infiniband::{Infiniband, InfinibandChild};
+use crate::netconfig_dhcp::{HostnameOption, NetconfigDhcp};
 use crate::tuntap::Tap;
 use crate::tuntap::Tun;
 use crate::vlan::Vlan;
@@ -363,9 +364,12 @@ impl From<&LinkPort> for model::PortConfig {
 }
 
 impl Interface {
-    pub fn to_connection(&self) -> Result<ConnectionResult, anyhow::Error> {
+    pub fn to_connection(
+        &self,
+        netconfig_dhcp: &Option<NetconfigDhcp>,
+    ) -> Result<ConnectionResult, anyhow::Error> {
         let settings = MIGRATION_SETTINGS.get().unwrap();
-        let ip_config = self.to_ip_config()?;
+        let ip_config = self.to_ip_config(netconfig_dhcp)?;
         let mut warnings = ip_config.warnings;
         warnings.append(&mut check_ignored(self));
         let mut connection = model::Connection {
@@ -458,7 +462,10 @@ impl Interface {
         })
     }
 
-    pub fn to_ip_config(&self) -> Result<IpConfigResult, anyhow::Error> {
+    pub fn to_ip_config(
+        &self,
+        netconfig_dhcp: &Option<NetconfigDhcp>,
+    ) -> Result<IpConfigResult, anyhow::Error> {
         let mut connection_result = IpConfigResult {
             ip_config: IpConfig {
                 ..Default::default()
@@ -539,7 +546,13 @@ impl Interface {
             let mut dhcp_settings = Dhcp4Settings::default();
             if let Some(hostname) = &ipv4_dhcp.hostname {
                 dhcp_settings.send_hostname = true;
-                dhcp_settings.hostname = Some(hostname.clone());
+                if let Some(netconfig_dhcp) = netconfig_dhcp {
+                    if netconfig_dhcp.dhclient_hostname_option != HostnameOption::Auto {
+                        dhcp_settings.hostname = Some(hostname.clone());
+                    }
+                } else {
+                    dhcp_settings.hostname = Some(hostname.clone());
+                }
             } else {
                 dhcp_settings.send_hostname = false;
             }
@@ -552,8 +565,13 @@ impl Interface {
             let mut dhcp_settings = Dhcp6Settings::default();
             if let Some(hostname) = &ipv6_dhcp.hostname {
                 dhcp_settings.send_hostname = true;
-                // The problem here is if it's just the default hostname it shouldn't be hardcoded here...
-                dhcp_settings.hostname = Some(hostname.clone());
+                if let Some(netconfig_dhcp) = netconfig_dhcp {
+                    if netconfig_dhcp.dhclient6_hostname_option != HostnameOption::Auto {
+                        dhcp_settings.hostname = Some(hostname.clone());
+                    }
+                } else {
+                    dhcp_settings.hostname = Some(hostname.clone());
+                }
             } else {
                 dhcp_settings.send_hostname = false;
             }
@@ -772,7 +790,7 @@ mod tests {
         };
 
         let static_connection: model::Connection =
-            static_interface.to_connection().unwrap().connections[0].to_owned();
+            static_interface.to_connection(&None).unwrap().connections[0].to_owned();
         assert_eq!(static_connection.ip_config.method4, Ipv4Method::Manual);
         assert_eq!(
             static_connection.ip_config.addresses[0].to_string(),
@@ -828,7 +846,7 @@ mod tests {
         };
 
         let static_connection: model::Connection =
-            static_interface.to_connection().unwrap().connections[0].to_owned();
+            static_interface.to_connection(&None).unwrap().connections[0].to_owned();
         assert_eq!(static_connection.ip_config.method4, Ipv4Method::Auto);
         assert_eq!(static_connection.ip_config.method6, Ipv6Method::Auto);
         assert_eq!(static_connection.ip_config.addresses.len(), 0);
@@ -845,7 +863,7 @@ mod tests {
         };
 
         let connection: &model::Connection =
-            &dummy_interface.to_connection().unwrap().connections[0];
+            &dummy_interface.to_connection(&None).unwrap().connections[0];
         assert!(matches!(connection.config, model::ConnectionConfig::Dummy));
         assert_eq!(connection.mac_address.to_string(), "12:34:56:78:9A:BC");
 
@@ -857,7 +875,7 @@ mod tests {
         };
 
         let connection: &model::Connection =
-            &dummy_interface.to_connection().unwrap().connections[0];
+            &dummy_interface.to_connection(&None).unwrap().connections[0];
         assert!(matches!(connection.config, model::ConnectionConfig::Dummy));
         assert_eq!(dummy_interface.dummy.unwrap().address, None);
         assert!(matches!(connection.mac_address, MacAddress::Unset));
@@ -873,7 +891,7 @@ mod tests {
             ..Default::default()
         };
 
-        let con: model::Connection = ifc.to_connection().unwrap().connections[0].to_owned();
+        let con: model::Connection = ifc.to_connection(&None).unwrap().connections[0].to_owned();
         assert_eq!(con.firewall_zone, Some("topsecret".to_string()));
     }
 
@@ -882,11 +900,11 @@ mod tests {
         setup_default_migration_settings();
         let mut ifc = Interface::default();
 
-        let con: model::Connection = ifc.to_connection().unwrap().connections[0].to_owned();
+        let con: model::Connection = ifc.to_connection(&None).unwrap().connections[0].to_owned();
         assert_eq!(con.autoconnect, false);
 
         ifc.control.mode = ControlMode::Boot;
-        let con: model::Connection = ifc.to_connection().unwrap().connections[0].to_owned();
+        let con: model::Connection = ifc.to_connection(&None).unwrap().connections[0].to_owned();
         assert_eq!(con.autoconnect, true);
     }
 

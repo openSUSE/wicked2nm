@@ -1,5 +1,6 @@
 use crate::interface::Interface;
 use crate::netconfig::{read_netconfig, Netconfig};
+use crate::netconfig_dhcp::{read_netconfig_dhcp, NetconfigDhcp};
 use crate::MIGRATION_SETTINGS;
 
 use regex::Regex;
@@ -10,6 +11,7 @@ use std::path::{Path, PathBuf};
 pub struct InterfacesResult {
     pub interfaces: Vec<Interface>,
     pub netconfig: Option<Netconfig>,
+    pub netconfig_dhcp: Option<NetconfigDhcp>,
     pub warning: Option<anyhow::Error>,
 }
 
@@ -48,6 +50,7 @@ pub fn deserialize_xml(contents: String) -> Result<InterfacesResult, anyhow::Err
     let mut result = InterfacesResult {
         interfaces,
         netconfig: None,
+        netconfig_dhcp: None,
         warning: None,
     };
     if !unhandled_fields.is_empty() {
@@ -115,6 +118,19 @@ pub fn read(paths: Vec<String>) -> Result<InterfacesResult, anyhow::Error> {
                 log::warn!("{}", msg);
             }
         };
+        match read_netconfig_dhcp(settings.netconfig_dhcp_path.clone()) {
+            Ok(netconfig_dhcp) => result.netconfig_dhcp = Some(netconfig_dhcp),
+            Err(e) => {
+                let msg = format!(
+                    "Failed to read netconfig_dhcp at {}: {}",
+                    settings.netconfig_dhcp_path, e
+                );
+                if !settings.continue_migration {
+                    anyhow::bail!(msg);
+                };
+                log::warn!("{}", msg);
+            }
+        };
     }
 
     // Filter loopback as it doesn't need to be migrated
@@ -127,6 +143,7 @@ fn read_files(file_paths: Vec<String>) -> Result<InterfacesResult, anyhow::Error
     let mut result = InterfacesResult {
         interfaces: vec![],
         netconfig: None,
+        netconfig_dhcp: None,
         warning: None,
     };
 

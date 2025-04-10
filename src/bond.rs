@@ -351,7 +351,7 @@ mod tests {
         };
 
         let connection: &model::Connection =
-            &bond_interface.to_connection().unwrap().connections[0];
+            &bond_interface.to_connection(&None).unwrap().connections[0];
         assert!(matches!(
             connection.config,
             model::ConnectionConfig::Bond(_)
