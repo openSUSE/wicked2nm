@@ -4,6 +4,7 @@ mod infiniband;
 mod interface;
 mod migrate;
 mod netconfig;
+mod netconfig_dhcp;
 mod reader;
 mod tuntap;
 mod vlan;
@@ -42,6 +43,9 @@ struct GlobalOpts {
 
     #[arg(long, global = true, default_value_t = String::from("/etc/sysconfig/network/config"), env = "W2NM_NETCONFIG_PATH")]
     pub netconfig_path: String,
+
+    #[arg(long, global = true, default_value_t = String::from("/etc/sysconfig/network/dhcp"), env = "W2NM_NETCONFIG_DHCP_PATH")]
+    pub netconfig_dhcp_path: String,
 }
 
 #[derive(Subcommand)]
@@ -96,6 +100,7 @@ async fn run_command(cli: Cli) -> anyhow::Result<()> {
                     activate_connections: true,
                     with_netconfig: !cli.global_opts.without_netconfig,
                     netconfig_path: cli.global_opts.netconfig_path,
+                    netconfig_dhcp_path: cli.global_opts.netconfig_dhcp_path,
                 })
                 .expect("MIGRATION_SETTINGS was set too early");
 
@@ -134,6 +139,7 @@ async fn run_command(cli: Cli) -> anyhow::Result<()> {
                     activate_connections,
                     with_netconfig: !cli.global_opts.without_netconfig,
                     netconfig_path: cli.global_opts.netconfig_path,
+                    netconfig_dhcp_path: cli.global_opts.netconfig_dhcp_path,
                 })
                 .expect("MIGRATION_SETTINGS was set too early");
 
@@ -148,7 +154,13 @@ async fn run_command(cli: Cli) -> anyhow::Result<()> {
                 return Err(interfaces_result.warning.unwrap());
             }
 
-            match migrate(interfaces_result.interfaces, interfaces_result.netconfig).await {
+            match migrate(
+                interfaces_result.interfaces,
+                interfaces_result.netconfig,
+                interfaces_result.netconfig_dhcp,
+            )
+            .await
+            {
                 Ok(()) => Ok(()),
                 Err(e) => Err(anyhow::anyhow!("Migration failed: {}", e)),
             }
@@ -177,6 +189,7 @@ struct MigrationSettings {
     activate_connections: bool,
     with_netconfig: bool,
     netconfig_path: String,
+    netconfig_dhcp_path: String,
 }
 
 impl Default for MigrationSettings {
@@ -187,6 +200,7 @@ impl Default for MigrationSettings {
             activate_connections: true,
             with_netconfig: false,
             netconfig_path: "".to_string(),
+            netconfig_dhcp_path: "".to_string(),
         }
     }
 }

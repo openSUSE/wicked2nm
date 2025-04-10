@@ -607,6 +607,7 @@ mod tests {
             activate_connections: true,
             with_netconfig: false,
             netconfig_path: "".to_string(),
+            netconfig_dhcp_path: "".to_string(),
         });
     }
 
@@ -630,7 +631,7 @@ mod tests {
             }),
             ..Default::default()
         };
-        let connections = wireless_interface.to_connection();
+        let connections = wireless_interface.to_connection(&None);
         assert!(connections.is_ok());
         let connection = &connections.unwrap().connections[0];
         let model::ConnectionConfig::Wireless(wireless) = &connection.config else {
@@ -646,7 +647,7 @@ mod tests {
             .as_mut()
             .unwrap()[0]
             .channel = Some(32);
-        let ifc = wireless_interface.to_connection();
+        let ifc = wireless_interface.to_connection(&None);
         assert!(ifc.is_ok());
         let ifc = &ifc.unwrap().connections[0];
         let model::ConnectionConfig::Wireless(wireless) = &ifc.config else {
@@ -682,7 +683,7 @@ mod tests {
             }),
             ..Default::default()
         };
-        let connections = wireless_interface.to_connection();
+        let connections = wireless_interface.to_connection(&None);
         assert!(connections.is_ok());
         let connection = &connections.unwrap().connections[0];
         let model::ConnectionConfig::Wireless(wireless) = &connection.config else {

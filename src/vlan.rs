@@ -77,7 +77,7 @@ mod tests {
             ..Default::default()
         };
 
-        let ifc = vlan_interface.to_connection();
+        let ifc = vlan_interface.to_connection(&None);
 
         assert!(ifc.is_ok());
         let ifc = &ifc.unwrap().connections[0];

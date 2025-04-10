@@ -1,5 +1,6 @@
 use crate::interface::Interface;
 use crate::netconfig::Netconfig;
+use crate::netconfig_dhcp::NetconfigDhcp;
 use crate::MIGRATION_SETTINGS;
 use agama_server::network::model::{Connection, GeneralState, IpConfig, MatchConfig, StateConfig};
 use agama_server::network::{model, Adapter, NetworkManagerAdapter, NetworkState};
@@ -68,13 +69,14 @@ fn create_lo_connection() -> Connection {
 pub async fn migrate(
     interfaces: Vec<Interface>,
     netconfig: Option<Netconfig>,
+    netconfig_dhcp: Option<NetconfigDhcp>,
 ) -> Result<(), Box<dyn Error>> {
     let settings = MIGRATION_SETTINGS.get().unwrap();
     let mut parents: HashMap<String, String> = HashMap::new();
     let mut connections: Vec<Connection> = vec![];
 
     for interface in interfaces {
-        let connection_result = interface.to_connection()?;
+        let connection_result = interface.to_connection(&netconfig_dhcp)?;
         if !connection_result.warnings.is_empty() {
             for connection_error in &connection_result.warnings {
                 log::warn!("{}", connection_error);

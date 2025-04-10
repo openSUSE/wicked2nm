@@ -84,7 +84,7 @@ mod tests {
             ..Default::default()
         };
 
-        let connections = infiniband_interface.to_connection();
+        let connections = infiniband_interface.to_connection(&None);
         assert!(connections.is_ok());
         let connection = &connections.unwrap().connections[0];
         let model::ConnectionConfig::Infiniband(infiniband) = &connection.config else {
@@ -109,7 +109,7 @@ mod tests {
             ..Default::default()
         };
 
-        let connections = infiniband_child_interface.to_connection();
+        let connections = infiniband_child_interface.to_connection(&None);
         assert!(connections.is_ok());
 
         // Check multicast warning is generated
