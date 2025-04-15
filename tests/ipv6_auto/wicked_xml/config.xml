@@ -1,18 +1,15 @@
-<interface origin="compat:suse:/etc/sysconfig/network/ifcfg-eth7">
+<interface origin="compat:suse:/tests/ipv6_auto/netconfig/ifcfg-eth7">
   <name>eth7</name>
   <control>
     <mode>boot</mode>
   </control>
-  <firewall/>
   <link/>
   <ipv4>
     <enabled>true</enabled>
-    <arp-verify>true</arp-verify>
   </ipv4>
   <ipv6>
     <enabled>true</enabled>
     <privacy>prefer-public</privacy>
-    <accept-redirects>false</accept-redirects>
   </ipv6>
   <ipv6:auto>
     <enabled>true</enabled>

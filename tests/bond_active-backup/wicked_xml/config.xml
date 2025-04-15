@@ -23,7 +23,7 @@
   <ipv4:dhcp>
     <enabled>true</enabled>
     <flags>group</flags>
-    <update>default-route,dns,nis,ntp,smb,nds,mtu,tz,boot</update>
+    <update>default-route,dns,nis,ntp,nds,mtu,tz,boot</update>
     <defer-timeout>15</defer-timeout>
     <recover-lease>true</recover-lease>
     <release-lease>false</release-lease>
