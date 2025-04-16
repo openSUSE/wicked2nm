@@ -24,7 +24,7 @@ use crate::interface::Interface;
 use crate::netconfig::Netconfig;
 
 #[derive(Parser)]
-#[command(name = "wicked2nm", version(concat!(env!("CARGO_PKG_VERSION"),"~",env!("GIT_HEAD"))), about, long_about = None)]
+#[command(name = "wicked2nm", version, about, long_about = None)]
 struct Cli {
     #[clap(flatten)]
     global_opts: GlobalOpts,
