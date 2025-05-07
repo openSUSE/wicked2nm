@@ -390,7 +390,11 @@ impl Interface {
         let mut connections: Vec<model::Connection> = vec![];
 
         if settings.activate_connections {
-            connection.status = Status::Up;
+            connection.status = if connection.autoconnect {
+                Status::Up
+            } else {
+                Status::Down
+            };
         }
 
         if let Some(ethernet) = &self.ethernet {

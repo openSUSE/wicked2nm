@@ -74,7 +74,7 @@ pub enum Commands {
         #[arg(long, global = true, env = "W2NM_DRY_RUN")]
         dry_run: bool,
 
-        /// Activate connections immediately
+        /// Activate connections that are marked as autostart immediately
         #[arg(long, global = true, env = "W2NM_ACTIVATE_CONNECTIONS")]
         activate_connections: bool,
     },
