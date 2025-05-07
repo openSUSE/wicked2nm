@@ -62,7 +62,9 @@ pub fn deserialize_xml(contents: String) -> Result<InterfacesResult, anyhow::Err
                 split_str.1
             );
         }
-        result.warning = Some(anyhow::anyhow!("Unhandled fields"))
+        result.warning = Some(anyhow::anyhow!(
+            "Unhandled fields, use the `--continue-migration` flag to ignore"
+        ))
     }
     Ok(result)
 }
@@ -113,7 +115,7 @@ pub fn read(paths: Vec<String>) -> Result<InterfacesResult, anyhow::Error> {
                     settings.netconfig_path, e
                 );
                 if !settings.continue_migration {
-                    anyhow::bail!(msg);
+                    anyhow::bail!("{}, use the `--continue-migration` flag to ignore", msg);
                 };
                 log::warn!("{}", msg);
             }
@@ -126,7 +128,7 @@ pub fn read(paths: Vec<String>) -> Result<InterfacesResult, anyhow::Error> {
                     settings.netconfig_dhcp_path, e
                 );
                 if !settings.continue_migration {
-                    anyhow::bail!(msg);
+                    anyhow::bail!("{}, use the `--continue-migration` flag to ignore", msg);
                 };
                 log::warn!("{}", msg);
             }
