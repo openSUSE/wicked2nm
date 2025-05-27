@@ -2,6 +2,7 @@
 id=sfp1
 uuid=43fb1e44-9f5c-43f1-9372-9c0f42eb3473
 type=ethernet
+autoconnect=false
 controller=bond0
 interface-name=sfp1
 port-type=bond

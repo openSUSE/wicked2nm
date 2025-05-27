@@ -2,6 +2,7 @@
 id=br99
 uuid=bbd5f9fa-7905-4d8e-a319-34cbb4b77872
 type=bridge
+autoconnect-ports=1
 interface-name=br99
 
 [ethernet]
