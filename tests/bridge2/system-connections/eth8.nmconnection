@@ -2,6 +2,7 @@
 id=eth8
 uuid=18cb882a-33ef-49ac-a9dd-151a9e014fb1
 type=ethernet
+autoconnect=false
 controller=br99
 interface-name=eth8
 port-type=bridge

@@ -2,6 +2,7 @@
 id=bond0
 uuid=17e25c83-3b11-49d1-9096-38e97c0fd065
 type=bond
+autoconnect-ports=1
 interface-name=bond0
 zone=public
 

@@ -2,6 +2,7 @@
 id=en1
 uuid=9269bbb4-a771-406f-ba66-3f65ed15634c
 type=ethernet
+autoconnect=false
 controller=bond0
 interface-name=en1
 port-type=bond
