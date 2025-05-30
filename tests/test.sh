@@ -156,7 +156,7 @@ for test_dir in ${TEST_DIRS}; do
         fi
 
         # https://unix.stackexchange.com/a/209744
-        regex_esc_test_dir="$(printf '%s' "$test_dir" | sed 's/[.[\(*^$+?{|]/\\&/g')"
+        regex_esc_test_dir="$(printf '%s' "$test_dir" | sed 's/[\/.[\(*^$+?{|]/\\&/g')"
         sed -i -E 's/[^:]+(\/tests\/'"$regex_esc_test_dir"')/\1/' "$cfg_out"
     fi
 
