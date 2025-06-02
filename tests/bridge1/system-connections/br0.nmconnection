@@ -2,6 +2,7 @@
 id=br0
 uuid=c1960284-68f5-4294-b1b7-f865ac5a4994
 type=bridge
+autoconnect-ports=1
 interface-name=br0
 
 [ethernet]

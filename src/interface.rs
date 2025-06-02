@@ -7,10 +7,10 @@ use crate::tuntap::Tun;
 use crate::vlan::Vlan;
 use crate::wireless::Wireless;
 use crate::MIGRATION_SETTINGS;
-use agama_lib::network::types::Status;
-use agama_server::network::model::{
+use agama_network::model::{
     self, Dhcp4Settings, Dhcp6Settings, IpConfig, IpRoute, Ipv4Method, Ipv6Method, MacAddress,
 };
+use agama_network::types::Status;
 use anyhow::anyhow;
 use cidr::IpInet;
 use serde::{Deserialize, Serialize};

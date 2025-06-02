@@ -1,4 +1,4 @@
-use agama_server::network::model;
+use agama_network::model;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
@@ -19,7 +19,7 @@ pub struct Bridge {
 impl From<&Bridge> for model::ConnectionConfig {
     fn from(bridge: &Bridge) -> model::ConnectionConfig {
         model::ConnectionConfig::Bridge(model::BridgeConfig {
-            stp: bridge.stp,
+            stp: Some(bridge.stp),
             priority: bridge.priority.map(|v| v as u32),
             forward_delay: bridge.forward_delay.map(|v| v.round() as u32),
             hello_time: bridge.hello_time.map(|v| v.round() as u32),
