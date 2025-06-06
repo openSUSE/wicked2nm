@@ -549,7 +549,7 @@ impl Interface {
         if let Some(ipv4_dhcp) = &self.ipv4_dhcp {
             let mut dhcp_settings = Dhcp4Settings::default();
             if let Some(hostname) = &ipv4_dhcp.hostname {
-                dhcp_settings.send_hostname = true;
+                dhcp_settings.send_hostname = Some(true);
                 if let Some(netconfig_dhcp) = netconfig_dhcp {
                     if netconfig_dhcp.dhclient_hostname_option != HostnameOption::Auto {
                         dhcp_settings.hostname = Some(hostname.clone());
@@ -558,7 +558,7 @@ impl Interface {
                     dhcp_settings.hostname = Some(hostname.clone());
                 }
             } else {
-                dhcp_settings.send_hostname = false;
+                dhcp_settings.send_hostname = Some(false);
             }
             dhcp_settings.send_release = Some(ipv4_dhcp.release_lease);
             dhcp4_settings = Some(dhcp_settings);
@@ -568,7 +568,7 @@ impl Interface {
         if let Some(ipv6_dhcp) = &self.ipv6_dhcp {
             let mut dhcp_settings = Dhcp6Settings::default();
             if let Some(hostname) = &ipv6_dhcp.hostname {
-                dhcp_settings.send_hostname = true;
+                dhcp_settings.send_hostname = Some(true);
                 if let Some(netconfig_dhcp) = netconfig_dhcp {
                     if netconfig_dhcp.dhclient6_hostname_option != HostnameOption::Auto {
                         dhcp_settings.hostname = Some(hostname.clone());
@@ -577,7 +577,7 @@ impl Interface {
                     dhcp_settings.hostname = Some(hostname.clone());
                 }
             } else {
-                dhcp_settings.send_hostname = false;
+                dhcp_settings.send_hostname = Some(false);
             }
             dhcp_settings.send_release = Some(ipv6_dhcp.release_lease);
             dhcp6_settings = Some(dhcp_settings);

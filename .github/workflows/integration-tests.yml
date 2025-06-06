@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        os: [tumbleweed]
+        os: [tumbleweed, leap15.6]
     env:
       IMAGE: registry.opensuse.org/home/jcronenberg/github-ci/containers_${{ matrix.os }}/wicked2nm-${{ matrix.os }}:latest
     steps:
@@ -21,9 +21,7 @@ jobs:
           ~/.cargo/registry/cache/
           ~/.cargo/git/db/
           target/
-        key: wicked2nm-${{ hashFiles('Cargo.lock') }}
-    - name: Start container
-      run: podman run --detach --name wicked2nm -e CARGO_TERM_COLOR=always -v .:/checkout registry.opensuse.org/home/jcronenberg/github-ci/containers_tumbleweed/wicked2nm-tumbleweed:latest
+        key: wicked2nm-${{ matrix.os }}-${{ hashFiles('Cargo.lock') }}
     - name: Pull container image
       run: podman pull $IMAGE
     - name: Build wicked2nm
