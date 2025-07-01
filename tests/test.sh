@@ -10,9 +10,12 @@ MIGRATE_WICKED_BIN="$SCRIPT_DIR/../target/debug/wicked2nm"
 TEST_DIRS=${TEST_DIRS:-$(ls -d */ | sed 's#/##')}
 NO_CLEANUP=${NO_CLEANUP:-0}
 NO_WICKED=${NO_WICKED:-0}
+NM_CLEANUP=${NM_CLEANUP:-0}
 LOG_LEVEL=1
 TEST_STDIN=true
 NM_VERSION=$(NetworkManager --version)
+KEEP_CONNECTIONS=()
+CONNECTIONS=()
 
 error_msg() {
   log_error "Error for test $1:$2"
@@ -26,9 +29,45 @@ log_verbose() {
     [ $LOG_LEVEL -gt 1 ] && echo -e "$@"
 }
 
+keep_connection() {
+    local con=$1
+    local element
+
+    for element in "${KEEP_CONNECTIONS[@]}"; do
+        if [[ "$element" == "$con" ]]; then
+            return 0 # Found
+        fi
+    done
+    return 1 # Not found
+}
+
+refresh_connections() {
+    local filename 
+
+    CONNECTIONS=()
+    while IFS= read -r -d '' filename ; do
+        [[ "$filename" != *".nmconnection" ]] && continue
+        uuid=$(grep '^uuid=' "$filename" -m 1 | cut -d=  -f2)
+        con_name=$(grep '^id=' "$filename" -m 1 | cut -d=  -f2)
+        keep_connection "$con_name" && continue
+        keep_connection "$uuid" && continue
+        CONNECTIONS+=("$con_name")
+    done < <(find "/etc/NetworkManager/system-connections/" -maxdepth 1 -type f -print0)
+}
+
 nm_cleanup() {
-    for con in $(ls /etc/NetworkManager/system-connections/ | sed 's/\.nmconnection//'); do
-        nmcli con delete $con
+    refresh_connections
+
+    for con in "${CONNECTIONS[@]}"; do
+        IFS=: read NAME UUID XXX < <(nmcli -t -f NAME,UUID c s | grep -P '(^|:)'"$con"'($|:)')
+        [[ -z "$UUID" ]] && continue;
+
+        echo "nmcli con delete $UUID ($NAME)"
+        nmcli con delete "$UUID"
+        while nmcli -t -f UUID c s | grep -P "^$UUID$" >/dev/null; do
+          echo " -> Wait for $NAME($UUID) deletion"
+            sleep 1 
+        done
     done
 }
 
@@ -46,6 +85,7 @@ print_help()
   echo "  --debug                 Prints out all commands executed"
   echo "  -q|--quiet              Be less verbose"
   echo "  --nm-cleanup            Cleanup current NetworkManager config before start"
+  echo "  -k|--keep-connection    Connections will not be removed with --nm-cleanup"
   echo "  --no-cleanup            Do not cleanup NetworkManger after test"
   echo "  --no-wicked             If set, ifcfg tests do not fail when wicked isn't available"
   echo "  -h|--help               Print this help"
@@ -67,18 +107,14 @@ while [[ $# -gt 0 ]]; do
       MIGRATE_WICKED_BIN=$1; shift
       ;;
     --no-wicked)
-      NO_WICKED=1; shift
+      NO_WICKED=1;
+      ;;
+    -k|--keep-connection)
+      KEEP_CONNECTIONS+=("$1")
+      shift;
       ;;
     --nm-cleanup)
-      connections=$(ls /etc/NetworkManager/system-connections/ | sed 's/\.nmconnection//')
-      if [ ! -z "${connections}" ]; then
-          echo -e "The following connections will be deleted:\n$connections"
-      	  read -p "Do you want to continue? [y/N] " continue_cleanup
-      	  if [ "$continue_cleanup" != "y" ]; then
-      	      exit 1
-      	  fi
-      fi
-      nm_cleanup
+      NM_CLEANUP=1
       ;;
     --no-cleanup)
       NO_CLEANUP=1
@@ -112,7 +148,21 @@ if [ ${#POSITIONAL_ARGS[@]} -gt 0 ]; then
   done
 fi
 
-if [[ $(ls -A /etc/NetworkManager/system-connections/) ]]; then
+if [[ $NM_CLEANUP -gt 0 ]]; then
+    refresh_connections
+    if [ ${#CONNECTIONS[@]} -gt 0 ]; then
+        echo -e "The following connections will be deleted:"
+        for c in "${CONNECTIONS[@]}"; do echo "  $c"; done | sort
+        read -p "Do you want to continue? [y/N] " continue_cleanup
+        if [ "$continue_cleanup" != "y" ]; then
+            exit 1
+        fi
+        nm_cleanup
+    fi
+fi
+
+refresh_connections
+if [[ ${#CONNECTIONS[@]} -gt 0 ]]; then
     echo -e "${RED}There are already NM connections. You may be running this script on a live system, which is highly discouraged!${NC}"
     exit 1
 fi
@@ -123,6 +173,12 @@ if [ ! -f $MIGRATE_WICKED_BIN ]; then
 fi
 
 for test_dir in ${TEST_DIRS}; do
+    if [ ! -d "$SCRIPT_DIR/$test_dir" ]; then
+        echo -e "${RED}[ERROR]${NC} Directory ${BOLD}$test_dir${NC} doesn't exists!"
+        FAILED_TESTS+=("${test_dir}::test-dir-exists")
+        continue
+    fi
+
     echo -e "${BOLD}Testing ${test_dir}${NC}"
 
     cd $SCRIPT_DIR/$test_dir
@@ -150,8 +206,8 @@ for test_dir in ${TEST_DIRS}; do
     fi
 
     if ls -1 ./netconfig/ifcfg-* >/dev/null 2>&1 && [ $NO_WICKED -eq 0 ]; then
-        err_log="./wicked_show_config_error.log"
-        cfg_out="./wicked_xml/config.xml"
+        err_log="$SCRIPT_DIR/$test_dir/wicked_show_config_error.log"
+        cfg_out="$SCRIPT_DIR/$test_dir/wicked_xml/config.xml"
         if ! command -v wicked >/dev/null ; then
             error_msg "$test_dir" "missing wicked executable"
             FAILED_TESTS+=("${test_dir}::wicked-show-config")
