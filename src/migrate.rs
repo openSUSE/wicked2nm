@@ -1,47 +1,110 @@
-use crate::interface::Interface;
+use crate::interface::{Interface, Link, LinkPort, LinkPortType};
 use crate::netconfig::{apply_dns_policy, Netconfig};
 use crate::netconfig_dhcp::NetconfigDhcp;
 use crate::MIGRATION_SETTINGS;
-use agama_network::model::{Connection, GeneralState, IpConfig, MatchConfig, StateConfig};
+use agama_network::model::{
+    Connection, ConnectionConfig, GeneralState, IpConfig, MatchConfig, StateConfig,
+};
 use agama_network::{model, Adapter, NetworkManagerAdapter, NetworkState};
 use cidr::IpInet;
+use std::fmt;
 use std::str::FromStr;
 use std::{collections::HashMap, error::Error};
 use uuid::Uuid;
 
+#[derive(Debug)]
+struct ParentMatch {
+    uuid: Uuid,
+    tag: Option<u16>,
+}
+
+impl From<Uuid> for ParentMatch {
+    fn from(value: Uuid) -> Self {
+        ParentMatch {
+            uuid: value,
+            tag: None,
+        }
+    }
+}
+
+impl fmt::Display for ParentMatch {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.tag {
+            Some(tag_value) => write!(f, "{}(tag: {tag_value})", self.uuid),
+            None => write!(f, "{}", self.uuid),
+        }
+    }
+}
+
+fn get_parentmatch_ovsbridge(
+    parent_connection: &Connection,
+    connections: &[Connection],
+) -> Option<ParentMatch> {
+    let bridge_port = connections
+        .iter()
+        .find(|c| Some(c.uuid) == parent_connection.controller)?;
+
+    let ConnectionConfig::OvsPort(config) = &bridge_port.config else {
+        return None;
+    };
+
+    let bridge = connections
+        .iter()
+        .find(|c| Some(c.uuid) == bridge_port.controller)?;
+
+    Some(ParentMatch {
+        uuid: bridge.uuid,
+        tag: config.tag,
+    })
+}
+
 fn update_parent_connection(
     connections: &mut [Connection],
-    parents: HashMap<String, String>,
+    parents: &mut HashMap<Uuid, Link>,
 ) -> Result<(), anyhow::Error> {
     let settings = MIGRATION_SETTINGS.get().unwrap();
-    let mut parent_uuid: HashMap<String, Uuid> = HashMap::new();
+    let mut parent_uuids: HashMap<Uuid, ParentMatch> = HashMap::new();
 
-    for (id, parent) in parents {
-        if let Some(parent_con) = connections
-            .iter()
-            .find(|c| c.interface.as_deref() == Some(&parent))
-        {
-            parent_uuid.insert(id, parent_con.uuid);
-        } else {
-            log::warn!("Missing parent {parent} connection for {id}");
+    for (port_uuid, parent) in parents.iter() {
+        let Some(parent_con) = connections.iter().find(|c| c.interface == parent.master) else {
+            log::warn!(
+                "Missing parent connection with interface {} for port {port_uuid}",
+                parent.clone().master.unwrap()
+            );
             if !settings.continue_migration {
-                return Err(anyhow::anyhow!("Migration of {} failed because of warnings, use the `--continue-migration` flag to ignore", id));
+                anyhow::bail!("Migration of {port_uuid} failed because of warnings, use the `--continue-migration` flag to ignore");
             }
+            continue;
+        };
+
+        let Some(port) = &parent.port else {
+            continue;
+        };
+
+        if let Some(parent_match) = match port.port_type {
+            LinkPortType::OvsBridge => get_parentmatch_ovsbridge(parent_con, connections),
+            _ => Some(ParentMatch::from(parent_con.uuid)),
+        } {
+            parent_uuids.insert(*port_uuid, parent_match);
         }
     }
 
-    for (id, uuid) in parent_uuid {
-        if let Some(connection) = connections
-            .iter_mut()
-            .find(|c| c.interface.as_deref() == Some(&id))
-        {
-            connection.controller = Some(uuid);
-        } else {
-            return Err(anyhow::anyhow!(
-                "Unexpected failure - missing connection {}",
-                id
-            ));
+    for (port_uuid, parent_match) in parent_uuids {
+        let Some(connection) = connections.iter_mut().find(|c| c.uuid == port_uuid) else {
+            anyhow::bail!(
+                "Unexpected failure - missing port connection {port_uuid} from parent {parent_match}"
+            );
+        };
+
+        connection.controller = Some(parent_match.uuid);
+
+        if let Some(vlan_tag) = parent_match.tag {
+            if let ConnectionConfig::OvsPort(config) = &mut connection.config {
+                config.tag = Some(vlan_tag);
+            }
         }
+
+        parents.remove(&port_uuid);
     }
 
     Ok(())
@@ -72,7 +135,7 @@ pub async fn migrate(
     netconfig_dhcp: Option<NetconfigDhcp>,
 ) -> Result<(), Box<dyn Error>> {
     let settings = MIGRATION_SETTINGS.get().unwrap();
-    let mut parents: HashMap<String, String> = HashMap::new();
+    let mut parents: HashMap<Uuid, Link> = HashMap::new();
     let mut connections: Vec<Connection> = vec![];
 
     for interface in interfaces {
@@ -91,14 +154,67 @@ pub async fn migrate(
         }
 
         for connection in connection_result.connections {
-            if let Some(parent) = &interface.link.master {
-                parents.insert(connection.id.clone(), parent.clone());
+            if connection.controller.is_none() {
+                if interface.link.master.is_some() {
+                    parents.insert(connection.uuid, interface.link.clone());
+                } else if let Some(ovs_bridge) = &interface.ovs_bridge {
+                    //  This "if let" handles the special port handling of ovs-bridge
+                    //  which is NOT defined via the `<link>` field but inside the
+                    //  `<ovs-bridge>` tag like (aka "fake bridge", see man 5 ifcfg-ovs-bridge):
+                    //
+                    //   <ovs-bridge>
+                    //    <vlan>
+                    //      <parent>ovsbrA</parent>
+                    //      <tag>10</tag>
+                    //    </vlan>
+                    //   </ovs-bridge>
+                    //
+                    //  The `vlan tag` is set in the corresponding ovs-port and needs to
+                    //  be inherited to the ports of this "fake bridge" (see:
+                    //  update_parent_connection() )
+                    //
+                    if let Some(vlan) = &ovs_bridge.vlan {
+                        let link = Link {
+                            master: Some(vlan.parent.clone()),
+                            port: Some(LinkPort {
+                                port_type: LinkPortType::OvsBridge,
+                                priority: None,
+                                path_cost: None,
+                            }),
+                            ..Default::default()
+                        };
+                        parents.insert(connection.uuid, link);
+                    }
+                }
             }
             connections.push(connection);
         }
     }
 
-    update_parent_connection(&mut connections, parents)?;
+    loop {
+        // This loop is needed, as we need to map the "ovs-port" of a "fake bridge"
+        // to the "ovs-bridge" first. And then link all "ovs-ports" from the fakebridge
+        // to the same "ovs-bridge".
+        //
+        let len = parents.len();
+        update_parent_connection(&mut connections, &mut parents)?;
+        if parents.is_empty() {
+            break;
+        }
+
+        if len == parents.len() {
+            let connections = connections
+                .iter()
+                .filter(|c| parents.contains_key(&c.uuid))
+                .map(|c| c.id.as_str())
+                .collect::<Vec<&str>>()
+                .join("\n");
+            return Err(anyhow::anyhow!(
+                "Unexpected error, port connection is missing controller: {connections}"
+            )
+            .into());
+        }
+    }
 
     let mut state = NetworkState::new(GeneralState::default(), vec![], vec![], vec![]);
     for connection in &connections {
