@@ -1,0 +1,12 @@
+[connection]
+id=br0-port
+uuid=81d6fe12-2cf3-4f42-b794-6d634bd15891
+type=ovs-port
+autoconnect-ports=1
+controller=br0-bridge
+interface-name=br0-port
+port-type=ovs-bridge
+
+[ovs-port]
+
+[match]

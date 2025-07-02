@@ -1,0 +1,12 @@
+[connection]
+id=tap10-port
+uuid=20ec90cb-e4e1-4478-997c-b118aea2df78
+type=ovs-port
+autoconnect-ports=1
+controller=br0-bridge
+interface-name=tap10-port
+port-type=ovs-bridge
+
+[ovs-port]
+
+[match]
