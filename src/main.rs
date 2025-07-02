@@ -5,6 +5,7 @@ mod interface;
 mod migrate;
 mod netconfig;
 mod netconfig_dhcp;
+mod ovs;
 mod reader;
 mod tuntap;
 mod vlan;
