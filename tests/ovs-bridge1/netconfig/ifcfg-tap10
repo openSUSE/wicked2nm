@@ -1,0 +1,5 @@
+BOOTPROTO='none'
+STARTMODE='auto'
+TUNNEL='tap'
+TUNNEL_SET_GROUP='root'
+TUNNEL_SET_OWNER='root'
