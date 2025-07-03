@@ -2,7 +2,6 @@
 id=eth9
 uuid=faea58e2-d243-4a36-a40d-897c3741e7c9
 type=ethernet
-autoconnect=false
 controller=br99
 interface-name=eth9
 port-type=bridge
