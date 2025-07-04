@@ -1,0 +1,13 @@
+[connection]
+id=en1-port
+uuid=2205d992-3374-4aad-8d10-363694ec8efa
+type=ovs-port
+autoconnect-ports=1
+controller=ovsbrA-bridge
+interface-name=en1-port
+port-type=ovs-bridge
+
+[ovs-port]
+tag=10
+
+[match]

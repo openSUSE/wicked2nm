@@ -1,0 +1,14 @@
+[connection]
+id=en0
+uuid=377c12d0-a12c-4c96-9dfa-501f7ee4e0e3
+type=ethernet
+controller=en0-port
+interface-name=en0
+port-type=ovs-port
+
+[ethernet]
+
+[ovs-interface]
+type=system
+
+[match]
