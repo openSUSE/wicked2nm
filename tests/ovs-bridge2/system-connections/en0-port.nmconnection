@@ -1,0 +1,12 @@
+[connection]
+id=en0-port
+uuid=20232292-14c6-42cc-9936-1198672187c8
+type=ovs-port
+autoconnect-slaves=1
+interface-name=en0-port
+master=ovsbrA-bridge
+slave-type=ovs-bridge
+
+[ovs-port]
+
+[match]
