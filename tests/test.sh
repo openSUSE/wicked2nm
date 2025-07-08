@@ -196,11 +196,11 @@ for test_dir in ${TEST_DIRS}; do
        set +a
     fi
 
-    if [ ! -z "$NM_VERSION_ge" ] && ! nm_version_greater_equal "$NM_VERSION_ge"; then
+    if [ -n "$NM_VERSION_ge" ] && ! nm_version_greater_equal "$NM_VERSION_ge"; then
         echo "NM version too low, skipping..."
         continue
     fi
-    if [ ! -z "$NM_VERSION_lt" ] && nm_version_greater_equal "$NM_VERSION_lt"; then
+    if [ -n "$NM_VERSION_lt" ] && nm_version_greater_equal "$NM_VERSION_lt"; then
         echo "NM version too high, skipping..."
         continue
     fi
