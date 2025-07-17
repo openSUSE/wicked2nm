@@ -2,7 +2,6 @@
 id=en1
 uuid=9269bbb4-a771-406f-ba66-3f65ed15634c
 type=ethernet
-autoconnect=false
 interface-name=en1
 master=bond0
 slave-type=bond
