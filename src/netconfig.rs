@@ -90,15 +90,15 @@ pub fn apply_dns_policy(
                 for con in nm_state
                     .connections
                     .iter_mut()
-                    .filter(|c| glob.is_match(&c.id))
+                    .filter(|c| {
+                        c.interface
+                            .as_ref()
+                            .is_some_and(|c_iface| glob.is_match(c_iface))
+                            && c.ip_config.dns_priority4.is_none()
+                            && c.ip_config.dns_priority6.is_none()
+                    })
                     .collect::<Vec<&mut Connection>>()
                 {
-                    // If con was already matched its priority should not be overwritten
-                    if con.ip_config.dns_priority4.is_some()
-                        && con.ip_config.dns_priority6.is_some()
-                    {
-                        continue;
-                    }
                     con.ip_config.dns_priority4 = Some(i);
                     con.ip_config.dns_priority6 = Some(i);
                 }
@@ -185,6 +185,7 @@ mod tests {
                 "ppp?".to_string(),
                 "eth0.??".to_string(),
                 "eth*".to_string(),
+                "wlan?".to_string(),
             ],
             ..Default::default()
         };
@@ -193,7 +194,7 @@ mod tests {
         assert!(nm_state
             .add_connection(Connection {
                 id: "eth0".to_string(),
-                config: agama_network::model::ConnectionConfig::Ethernet,
+                interface: Some("eth0".to_string()),
                 ..Default::default()
             })
             .is_ok());
@@ -201,7 +202,7 @@ mod tests {
         assert!(nm_state
             .add_connection(Connection {
                 id: "eth0.11".to_string(),
-                config: agama_network::model::ConnectionConfig::Ethernet,
+                interface: Some("eth0.11".to_string()),
                 ..Default::default()
             })
             .is_ok());
@@ -209,7 +210,7 @@ mod tests {
         assert!(nm_state
             .add_connection(Connection {
                 id: "eth0211".to_string(),
-                config: agama_network::model::ConnectionConfig::Ethernet,
+                interface: Some("eth0211".to_string()),
                 ..Default::default()
             })
             .is_ok());
@@ -217,7 +218,7 @@ mod tests {
         assert!(nm_state
             .add_connection(Connection {
                 id: "neth0".to_string(),
-                config: agama_network::model::ConnectionConfig::Ethernet,
+                interface: Some("neth0".to_string()),
                 ..Default::default()
             })
             .is_ok());
@@ -225,7 +226,7 @@ mod tests {
         assert!(nm_state
             .add_connection(Connection {
                 id: "ppp0".to_string(),
-                config: agama_network::model::ConnectionConfig::Ethernet,
+                interface: Some("ppp0".to_string()),
                 ..Default::default()
             })
             .is_ok());
@@ -233,7 +234,23 @@ mod tests {
         assert!(nm_state
             .add_connection(Connection {
                 id: "en0".to_string(),
-                config: agama_network::model::ConnectionConfig::Ethernet,
+                interface: Some("en0".to_string()),
+                ..Default::default()
+            })
+            .is_ok());
+        // Should match with wlan?
+        assert!(nm_state
+            .add_connection(Connection {
+                id: "wlan0-0".to_string(),
+                interface: Some("wlan0".to_string()),
+                ..Default::default()
+            })
+            .is_ok());
+        // Should match with wlan?
+        assert!(nm_state
+            .add_connection(Connection {
+                id: "wlan0-1".to_string(),
+                interface: Some("wlan0".to_string()),
                 ..Default::default()
             })
             .is_ok());
@@ -343,6 +360,38 @@ mod tests {
                 .ip_config
                 .dns_priority6,
             Some(30)
+        );
+        assert_eq!(
+            nm_state
+                .get_connection("wlan0-0")
+                .unwrap()
+                .ip_config
+                .dns_priority4,
+            Some(60)
+        );
+        assert_eq!(
+            nm_state
+                .get_connection("wlan0-0")
+                .unwrap()
+                .ip_config
+                .dns_priority6,
+            Some(60)
+        );
+        assert_eq!(
+            nm_state
+                .get_connection("wlan0-1")
+                .unwrap()
+                .ip_config
+                .dns_priority4,
+            Some(60)
+        );
+        assert_eq!(
+            nm_state
+                .get_connection("wlan0-1")
+                .unwrap()
+                .ip_config
+                .dns_priority6,
+            Some(60)
         );
         assert_eq!(
             nm_state
