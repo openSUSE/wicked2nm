@@ -11,6 +11,7 @@ TEST_DIRS=${TEST_DIRS:-$(ls -d */ | sed 's#/##')}
 NO_CLEANUP=${NO_CLEANUP:-0}
 NO_WICKED=${NO_WICKED:-0}
 NM_CLEANUP=${NM_CLEANUP:-0}
+FORCE=${FORCE:-0}
 LOG_LEVEL=1
 TEST_STDIN=true
 NM_VERSION=$(NetworkManager --version)
@@ -85,6 +86,7 @@ print_help()
   echo "  --debug                 Prints out all commands executed"
   echo "  -q|--quiet              Be less verbose"
   echo "  --nm-cleanup            Cleanup current NetworkManager config before start"
+  echo "  -f|--force              Force decision (e.g. cleanup Connections)"
   echo "  -k|--keep-connection    Connections will not be removed with --nm-cleanup"
   echo "  --no-cleanup            Do not cleanup NetworkManger after test"
   echo "  --no-wicked             If set, ifcfg tests do not fail when wicked isn't available"
@@ -115,6 +117,9 @@ while [[ $# -gt 0 ]]; do
       ;;
     --nm-cleanup)
       NM_CLEANUP=1
+      ;;
+    -f|--force)
+      FORCE=1
       ;;
     --no-cleanup)
       NO_CLEANUP=1
@@ -153,9 +158,11 @@ if [[ $NM_CLEANUP -gt 0 ]]; then
     if [ ${#CONNECTIONS[@]} -gt 0 ]; then
         echo -e "The following connections will be deleted:"
         for c in "${CONNECTIONS[@]}"; do echo "  $c"; done | sort
-        read -p "Do you want to continue? [y/N] " continue_cleanup
-        if [ "$continue_cleanup" != "y" ]; then
-            exit 1
+        if [ "$FORCE" -ne 1 ]; then
+          read -p "Do you want to continue? [y/N] " continue_cleanup
+          if [ "$continue_cleanup" != "y" ]; then
+              exit 1
+          fi
         fi
         nm_cleanup
     fi
