@@ -1,0 +1,17 @@
+[connection]
+id=tap10
+uuid=6c26d745-6fd1-45fe-98bf-00bcc31770f1
+type=tun
+interface-name=tap10
+master=tap10-port
+slave-type=ovs-port
+
+[ovs-interface]
+type=system
+
+[tun]
+group=0
+mode=2
+owner=0
+
+[match]

@@ -1,0 +1,17 @@
+[connection]
+id=tap20
+uuid=7cf60862-d5a2-426c-a6c6-5c8496d0e82b
+type=tun
+controller=tap20-port
+interface-name=tap20
+port-type=ovs-port
+
+[ovs-interface]
+type=system
+
+[tun]
+group=0
+mode=2
+owner=0
+
+[match]

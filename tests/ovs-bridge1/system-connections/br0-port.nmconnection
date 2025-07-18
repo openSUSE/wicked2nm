@@ -1,0 +1,12 @@
+[connection]
+id=br0-port
+uuid=0867d65a-221c-4ae4-b548-4e6592af8ff3
+type=ovs-port
+autoconnect-slaves=1
+interface-name=br0-port
+master=br0-bridge
+slave-type=ovs-bridge
+
+[ovs-port]
+
+[match]

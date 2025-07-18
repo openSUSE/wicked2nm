@@ -1,0 +1,13 @@
+[connection]
+id=ovsbrB-port
+uuid=8c95d17c-4dbf-4c58-a2c2-ffda25dc463e
+type=ovs-port
+autoconnect-ports=1
+controller=ovsbrA-bridge
+interface-name=ovsbrB-port
+port-type=ovs-bridge
+
+[ovs-port]
+tag=10
+
+[match]

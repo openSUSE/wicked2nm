@@ -20,7 +20,7 @@ checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 [[package]]
 name = "agama-network"
 version = "0.1.0"
-source = "git+https://github.com/agama-project/agama#c40e98af5cf5c71dd91a327f8f9284292ef9097a"
+source = "git+https://github.com/agama-project/agama#9d76c6780e8a86d37a326f6c54270ed15154992a"
 dependencies = [
  "agama-utils",
  "anyhow",
@@ -46,7 +46,7 @@ dependencies = [
 [[package]]
 name = "agama-utils"
 version = "0.1.0"
-source = "git+https://github.com/agama-project/agama#c40e98af5cf5c71dd91a327f8f9284292ef9097a"
+source = "git+https://github.com/agama-project/agama#9d76c6780e8a86d37a326f6c54270ed15154992a"
 dependencies = [
  "serde_json",
  "utoipa",
@@ -365,9 +365,9 @@ checksum = "d71b6127be86fdcfddb610f7182ac57211d4b18a3e9c82eb2d17662f2227ad6a"
 
 [[package]]
 name = "cc"
-version = "1.2.29"
+version = "1.2.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c1599538de2394445747c8cf7935946e3cc27e9625f889d979bfb2aaf569362"
+checksum = "deec109607ca693028562ed836a5f1c4b8bd77755c4e132fc5ce11b0b6211ae7"
 dependencies = [
  "shlex",
 ]
@@ -1985,9 +1985,9 @@ dependencies = [
 
 [[package]]
 name = "zbus"
-version = "5.8.0"
+version = "5.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "597f45e98bc7e6f0988276012797855613cd8269e23b5be62cc4e5d28b7e515d"
+checksum = "4bb4f9a464286d42851d18a605f7193b8febaf5b0919d71c6399b7b26e5b0aad"
 dependencies = [
  "async-broadcast",
  "async-executor",
@@ -2019,9 +2019,9 @@ dependencies = [
 
 [[package]]
 name = "zbus_macros"
-version = "5.8.0"
+version = "5.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e5c8e4e14dcdd9d97a98b189cd1220f30e8394ad271e8c987da84f73693862c2"
+checksum = "ef9859f68ee0c4ee2e8cde84737c78e3f4c54f946f2a38645d0d4c7a95327659"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
