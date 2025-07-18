@@ -77,13 +77,11 @@ pub fn apply_dns_policy(
         match policy.as_str() {
             "" => continue,
             "STATIC" => {
-                let mut loopback = match nm_state.get_connection("lo") {
-                    Some(lo) => lo.clone(),
-                    None => anyhow::bail!("Failed to get loopback connection"),
+                let Some(loopback) = nm_state.get_connection_mut("lo") else {
+                    anyhow::bail!("Failed to get loopback connection");
                 };
                 loopback.ip_config.dns_priority4 = Some(i);
                 loopback.ip_config.dns_priority6 = Some(i);
-                nm_state.update_connection(loopback)?;
             }
             _ => {
                 let glob = Glob::new(policy)?.compile_matcher();
