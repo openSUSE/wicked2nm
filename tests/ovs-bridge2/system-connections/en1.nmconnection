@@ -1,0 +1,14 @@
+[connection]
+id=en1
+uuid=d18dc48d-68ec-494e-ba56-08653161e9dc
+type=ethernet
+interface-name=en1
+master=en1-port
+slave-type=ovs-port
+
+[ethernet]
+
+[ovs-interface]
+type=system
+
+[match]

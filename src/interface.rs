@@ -2,6 +2,7 @@ use crate::bond::Bond;
 use crate::bridge::Bridge;
 use crate::infiniband::{Infiniband, InfinibandChild};
 use crate::netconfig_dhcp::{HostnameOption, NetconfigDhcp};
+use crate::ovs::OvsBridge;
 use crate::tuntap::Tap;
 use crate::tuntap::Tun;
 use crate::vlan::Vlan;
@@ -51,6 +52,8 @@ pub struct Interface {
     pub infiniband_child: Option<InfinibandChild>,
     pub tun: Option<Tun>,
     pub tap: Option<Tap>,
+    #[serde(rename = "ovs-bridge")]
+    pub ovs_bridge: Option<OvsBridge>,
     pub control: Control,
 }
 
@@ -62,7 +65,7 @@ pub struct Firewall {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Default, Serialize, Deserialize, Clone)]
 #[serde(default)]
 pub struct Link {
     pub master: Option<String>,
@@ -71,7 +74,7 @@ pub struct Link {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct LinkPort {
     #[serde(rename = "@type")]
@@ -80,11 +83,12 @@ pub struct LinkPort {
     pub path_cost: Option<u32>,
 }
 
-#[derive(Debug, PartialEq, SerializeDisplay, DeserializeFromStr, EnumString, Display)]
-#[strum(serialize_all = "lowercase")]
+#[derive(Debug, PartialEq, SerializeDisplay, DeserializeFromStr, EnumString, Display, Clone)]
+#[strum(serialize_all = "kebab-case")]
 pub enum LinkPortType {
     Bridge,
     Bond,
+    OvsBridge,
 }
 
 fn default_true() -> bool {
@@ -359,11 +363,20 @@ impl From<&LinkPort> for model::PortConfig {
                 path_cost: port.path_cost,
             }),
             LinkPortType::Bond => model::PortConfig::None,
+            LinkPortType::OvsBridge => model::PortConfig::OvsBridge(model::OvsBridgePortConfig {}),
         }
     }
 }
 
 impl Interface {
+    fn to_ovs_port_name(&self) -> String {
+        format!("{}-port", self.name)
+    }
+
+    fn to_ovs_bridge_name(&self) -> String {
+        format!("{}-bridge", self.name)
+    }
+
     pub fn to_connection(
         &self,
         netconfig_dhcp: &Option<NetconfigDhcp>,
@@ -371,6 +384,7 @@ impl Interface {
         let settings = MIGRATION_SETTINGS.get().unwrap();
         let ip_config = self.to_ip_config(netconfig_dhcp)?;
         let mut warnings = ip_config.warnings;
+        let mut connections: Vec<model::Connection> = vec![];
         warnings.append(&mut check_ignored(self));
         let mut connection = model::Connection {
             id: self.name.clone(),
@@ -385,9 +399,18 @@ impl Interface {
 
         if let Some(port) = &self.link.port {
             connection.port_config = port.into();
+            if let LinkPortType::OvsBridge = port.port_type {
+                let con_ovs_port = model::Connection {
+                    id: self.to_ovs_port_name(),
+                    interface: Some(self.to_ovs_port_name()),
+                    autoconnect: self.control.mode.clone().into(),
+                    config: model::ConnectionConfig::OvsPort(model::OvsPortConfig::default()),
+                    ..Default::default()
+                };
+                connection.controller = Some(con_ovs_port.uuid);
+                connections.push(con_ovs_port);
+            }
         }
-
-        let mut connections: Vec<model::Connection> = vec![];
 
         if settings.activate_connections {
             connection.status = if connection.autoconnect {
@@ -456,6 +479,40 @@ impl Interface {
         } else if let Some(tap) = &self.tap {
             connection.config = tap.into();
             connections.push(connection)
+        } else if let Some(ovs_bridge) = &self.ovs_bridge {
+            let mut vlan_tag: Option<u16> = None;
+            let mut controller_uuid = None;
+
+            if let Some(vlan) = &ovs_bridge.vlan {
+                vlan_tag = Some(vlan.tag);
+            } else {
+                let con_ovs_bridge = model::Connection {
+                    id: self.to_ovs_bridge_name(),
+                    interface: Some(self.to_ovs_bridge_name()),
+                    autoconnect: self.control.mode.clone().into(),
+                    config: model::ConnectionConfig::OvsBridge(model::OvsBridgeConfig::default()),
+                    ..Default::default()
+                };
+                controller_uuid = Some(con_ovs_bridge.uuid);
+                connections.push(con_ovs_bridge);
+            }
+
+            let con_ovs_port = model::Connection {
+                id: self.to_ovs_port_name(),
+                interface: Some(self.to_ovs_port_name()),
+                autoconnect: self.control.mode.clone().into(),
+                config: model::ConnectionConfig::OvsPort(model::OvsPortConfig { tag: vlan_tag }),
+                controller: controller_uuid,
+                ..Default::default()
+            };
+
+            connection.config = model::ConnectionConfig::OvsInterface(model::OvsInterfaceConfig {
+                interface_type: model::OvsInterfaceType::Internal,
+            });
+            connection.controller = Some(con_ovs_port.uuid);
+
+            connections.push(con_ovs_port);
+            connections.push(connection);
         } else {
             connections.push(connection);
         }
