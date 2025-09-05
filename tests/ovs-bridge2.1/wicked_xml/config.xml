@@ -1,35 +1,3 @@
-<interface origin="compat:suse:/tests/ovs-bridge2.1/netconfig/ifcfg-en0">
-  <name>en0</name>
-  <control>
-    <mode>boot</mode>
-  </control>
-  <link>
-    <master>ovsbrA</master>
-    <port type="ovs-bridge"/>
-  </link>
-  <ipv4>
-    <enabled>false</enabled>
-  </ipv4>
-  <ipv6>
-    <enabled>false</enabled>
-  </ipv6>
-</interface>
-<interface origin="compat:suse:/tests/ovs-bridge2.1/netconfig/ifcfg-en1">
-  <name>en1</name>
-  <control>
-    <mode>boot</mode>
-  </control>
-  <link>
-    <master>ovsbrB</master>
-    <port type="ovs-bridge"/>
-  </link>
-  <ipv4>
-    <enabled>false</enabled>
-  </ipv4>
-  <ipv6>
-    <enabled>false</enabled>
-  </ipv6>
-</interface>
 <interface origin="compat:suse:/tests/ovs-bridge2.1/netconfig/ifcfg-ovsbrA">
   <name>ovsbrA</name>
   <control>
@@ -48,6 +16,22 @@
   <ipv6>
     <enabled>true</enabled>
     <privacy>prefer-public</privacy>
+  </ipv6>
+</interface>
+<interface origin="compat:suse:/tests/ovs-bridge2.1/netconfig/ifcfg-en1">
+  <name>en1</name>
+  <control>
+    <mode>boot</mode>
+  </control>
+  <link>
+    <master>ovsbrB</master>
+    <port type="ovs-bridge"/>
+  </link>
+  <ipv4>
+    <enabled>false</enabled>
+  </ipv4>
+  <ipv6>
+    <enabled>false</enabled>
   </ipv6>
 </interface>
 <interface origin="compat:suse:/tests/ovs-bridge2.1/netconfig/ifcfg-ovsbrB">
@@ -73,5 +57,21 @@
   <ipv6>
     <enabled>true</enabled>
     <privacy>prefer-public</privacy>
+  </ipv6>
+</interface>
+<interface origin="compat:suse:/tests/ovs-bridge2.1/netconfig/ifcfg-en0">
+  <name>en0</name>
+  <control>
+    <mode>boot</mode>
+  </control>
+  <link>
+    <master>ovsbrA</master>
+    <port type="ovs-bridge"/>
+  </link>
+  <ipv4>
+    <enabled>false</enabled>
+  </ipv4>
+  <ipv6>
+    <enabled>false</enabled>
   </ipv6>
 </interface>

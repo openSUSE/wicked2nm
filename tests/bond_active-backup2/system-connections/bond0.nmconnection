@@ -18,12 +18,16 @@ use_carrier=1
 [match]
 
 [ipv4]
+dhcp-client-id=ipv6-duid
+dhcp-iaid=mac
 dhcp-send-hostname=false
 ignore-auto-dns=true
 method=auto
 
 [ipv6]
 addr-gen-mode=default
+dhcp-duid=llt
+dhcp-iaid=mac
 dhcp-send-hostname=false
 ignore-auto-dns=true
 ip6-privacy=1

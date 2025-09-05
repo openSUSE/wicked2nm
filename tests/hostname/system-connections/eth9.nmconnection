@@ -9,7 +9,9 @@ interface-name=eth9
 [match]
 
 [ipv4]
+dhcp-client-id=ipv6-duid
 dhcp-hostname=test-hostname-v4
+dhcp-iaid=mac
 dhcp-send-hostname=1
 dhcp-send-release=0
 ignore-auto-dns=true
@@ -17,7 +19,9 @@ method=auto
 
 [ipv6]
 addr-gen-mode=default
+dhcp-duid=llt
 dhcp-hostname=test-hostname-v6
+dhcp-iaid=mac
 dhcp-send-hostname=1
 dhcp-send-release=0
 ignore-auto-dns=true
