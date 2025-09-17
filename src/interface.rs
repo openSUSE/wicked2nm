@@ -728,11 +728,11 @@ fn check_ignored(interface: &Interface) -> Vec<anyhow::Error> {
             ));
         }
         if ipv4_dhcp.update != ipv4_dhcp_default.update {
-            warnings.push(anyhow!(
+            log::info!(
                 "Unhandled field in interface {}: {}",
                 interface.name,
                 stringify!(ipv4_dhcp.update)
-            ));
+            );
         }
         if ipv4_dhcp.defer_timeout != ipv4_dhcp_default.defer_timeout {
             warnings.push(anyhow!(
@@ -761,11 +761,11 @@ fn check_ignored(interface: &Interface) -> Vec<anyhow::Error> {
         }
 
         if ipv6_dhcp.update != ipv6_dhcp_default.update {
-            warnings.push(anyhow!(
+            log::info!(
                 "Unhandled field in interface {}: {}",
                 interface.name,
                 stringify!(ipv6_dhcp.update)
-            ));
+            );
         }
         if ipv6_dhcp.rapid_commit != ipv6_dhcp_default.rapid_commit {
             warnings.push(anyhow!(
@@ -1000,6 +1000,6 @@ mod tests {
             }),
             ..Default::default()
         };
-        assert!(check_ignored(&ifc).len() == 11);
+        assert!(check_ignored(&ifc).len() == 9);
     }
 }
