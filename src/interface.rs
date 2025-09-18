@@ -212,6 +212,7 @@ pub struct Ipv6Static {
 #[serde(default)]
 pub struct Address {
     pub local: String,
+    pub broadcast: Option<String>,
 }
 
 #[serde_as]
@@ -558,12 +559,31 @@ impl Interface {
         if let Some(ipv4_static) = &self.ipv4_static {
             if let Some(addresses_in) = &ipv4_static.addresses {
                 for addr in addresses_in {
-                    addresses.push(match IpInet::from_str(addr.local.as_str()) {
+                    let local_addr = match IpInet::from_str(addr.local.as_str()) {
                         Ok(address) => address,
                         Err(e) => {
                             anyhow::bail!("Failed to parse address \"{}\": {}", addr.local, e)
                         }
-                    });
+                    };
+                    if let Some(broadcast) = &addr.broadcast {
+                        let broadcast_addr = match IpAddr::from_str(broadcast) {
+                            Ok(address) => address,
+                            Err(e) => {
+                                anyhow::bail!(
+                                    "Failed to parse broadcast address \"{}\": {}",
+                                    broadcast,
+                                    e
+                                )
+                            }
+                        };
+                        if broadcast_addr != local_addr.last_address() {
+                            connection_result.warnings.push(anyhow!(
+                                "Broadcast \"{}\" for {}: Custom broadcast addresses are not supported by NetworkManager", broadcast, self.name
+                            ));
+                        }
+                    }
+
+                    addresses.push(local_addr);
                 }
             }
             if let Some(routes) = &ipv4_static.routes {
@@ -827,6 +847,7 @@ mod tests {
             ipv4_static: Some(Ipv4Static {
                 addresses: Some(vec![Address {
                     local: "127.0.0.1/8".to_string(),
+                    ..Default::default()
                 }]),
                 routes: Some(vec![Route {
                     nexthops: Some(vec![Nexthop {
@@ -839,6 +860,7 @@ mod tests {
             ipv6_static: Some(Ipv6Static {
                 addresses: Some(vec![Address {
                     local: "::1/128".to_string(),
+                    ..Default::default()
                 }]),
                 routes: Some(vec![Route {
                     nexthops: Some(vec![Nexthop {
@@ -1001,5 +1023,37 @@ mod tests {
             ..Default::default()
         };
         assert!(check_ignored(&ifc).len() == 9);
+    }
+
+    #[test]
+    fn test_broadcast() {
+        let ifc = Interface {
+            ipv4_static: Some(Ipv4Static {
+                addresses: Some(vec![Address {
+                    local: "192.168.100.10/24".to_string(),
+                    broadcast: Some("192.168.100.255".to_string()),
+                }]),
+                routes: None,
+            }),
+            ..Default::default()
+        };
+
+        let ip_result = ifc.to_ip_config(&None).unwrap();
+        println!("{:?}", ip_result.warnings);
+        assert!(ip_result.warnings.is_empty());
+
+        let ifc = Interface {
+            ipv4_static: Some(Ipv4Static {
+                addresses: Some(vec![Address {
+                    local: "192.168.100.10/24".to_string(),
+                    broadcast: Some("192.168.100.254".to_string()),
+                }]),
+                routes: None,
+            }),
+            ..Default::default()
+        };
+
+        let ip_result = ifc.to_ip_config(&None).unwrap();
+        assert!(ip_result.warnings.len() == 1);
     }
 }
