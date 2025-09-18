@@ -133,16 +133,28 @@ pub fn read(paths: Vec<String>) -> Result<InterfacesResult, anyhow::Error> {
         match read_netconfig(settings.netconfig_path.clone()) {
             Ok(netconfig) => result.netconfig = netconfig,
             Err(e) => {
-                let msg = format!(
+                anyhow::bail!(
                     "Failed to read netconfig at {}: {}",
-                    settings.netconfig_path, e
+                    settings.netconfig_path,
+                    e
                 );
-                if !settings.continue_migration {
-                    anyhow::bail!("{}, use the `--continue-migration` flag to ignore", msg);
-                };
-                log::warn!("{msg}");
             }
         };
+        if let Some(nc) = &result.netconfig {
+            if !nc.warnings.is_empty() {
+                for msg in &nc.warnings {
+                    log::warn!("{}: {msg}", settings.netconfig_path);
+                }
+
+                if !settings.continue_migration {
+                    anyhow::bail!(
+                        "{} parse errors, use the `--continue-migration` flag to ignore",
+                        settings.netconfig_path
+                    );
+                };
+            }
+        }
+
         match read_netconfig_dhcp(settings.netconfig_dhcp_path.clone()) {
             Ok(netconfig_dhcp) => result.netconfig_dhcp = Some(netconfig_dhcp),
             Err(e) => {
