@@ -129,10 +129,10 @@ mod tests {
     #[test]
     fn test_handle_netconfig_values() {
         env::set_var("NETCONFIG_DNS_POLICY", "STATIC_FALLBACK NetworkManager");
-        assert!(handle_netconfig_values().is_err());
+        assert!(handle_netconfig_values().unwrap().unwrap().warnings.len() == 1);
 
         env::set_var("NETCONFIG_DNS_POLICY", "STATIC_FALLBACK");
-        assert!(handle_netconfig_values().is_err());
+        assert!(handle_netconfig_values().unwrap().unwrap().warnings.len() == 1);
 
         env::set_var("NETCONFIG_DNS_POLICY", "");
         env::set_var(
@@ -156,7 +156,8 @@ mod tests {
                     "2001:db8::10".to_string()
                 ]),
                 static_dns_searchlist: Some(vec!["suse.com".to_string(), "suse.de".to_string()]),
-                dns_policy: vec!["STATIC".to_string()]
+                dns_policy: vec!["STATIC".to_string()],
+                ..Default::default()
             })
         );
 
