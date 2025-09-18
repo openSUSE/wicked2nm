@@ -190,11 +190,14 @@ for test_dir in ${TEST_DIRS}; do
 
     cd $SCRIPT_DIR/$test_dir
 
-    # Apply environment variables of test
-    export W2NM_CONTINUE_MIGRATION=false
-    export W2NM_WITHOUT_NETCONFIG=true
-    export W2NM_NETCONFIG_PATH=
-    export W2NM_NETCONFIG_DHCP_PATH=
+    # Reset all environment variables
+    unset W2NM_DRY_RUN
+    unset W2NM_ACTIVATE_CONNECTIONS
+    unset W2NM_CONTINUE_MIGRATION
+    unset W2NM_WITHOUT_NETCONFIG
+    unset W2NM_NETCONFIG_BASE_DIR
+    unset W2NM_NETCONFIG_PATH
+    unset W2NM_NETCONFIG_DHCP_PATH
     NM_VERSION_lt=
     NM_VERSION_ge=
     TEST_EXPECT_FAIL=false
