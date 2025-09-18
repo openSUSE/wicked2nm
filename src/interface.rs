@@ -898,7 +898,7 @@ mod tests {
     #[test]
     fn test_dhcp_interface_to_connection() {
         setup_default_migration_settings();
-        let static_interface = Interface {
+        let dhcp_interface = Interface {
             ipv4_dhcp: Some(Ipv4Dhcp {
                 enabled: true,
                 ..Default::default()
@@ -906,11 +906,11 @@ mod tests {
             ..Default::default()
         };
 
-        let static_connection: model::Connection =
-            static_interface.to_connection(&None).unwrap().connections[0].to_owned();
-        assert_eq!(static_connection.ip_config.method4, Ipv4Method::Auto);
-        assert_eq!(static_connection.ip_config.method6, Ipv6Method::Auto);
-        assert_eq!(static_connection.ip_config.addresses.len(), 0);
+        let dhcp_connection: model::Connection =
+            dhcp_interface.to_connection(&None).unwrap().connections[0].to_owned();
+        assert_eq!(dhcp_connection.ip_config.method4, Ipv4Method::Auto);
+        assert_eq!(dhcp_connection.ip_config.method6, Ipv6Method::Auto);
+        assert_eq!(dhcp_connection.ip_config.addresses.len(), 0);
     }
 
     #[test]
