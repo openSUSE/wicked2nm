@@ -15,6 +15,19 @@ pub struct InterfacesResult {
     pub warning: Option<anyhow::Error>,
 }
 
+// Define a list of fields that are ignored if present.
+// The list must be in alphabetical order.
+pub const IGNORED_FIELDS: &[&str] = &[
+    "ipv4.arp-notify",
+    "ipv4.forwarding",
+    "ipv6.accept-dad",
+    "ipv6.accept-ra",
+    "ipv6.addr-gen-mode",
+    "ipv6.autoconf",
+    "ipv6.forwarding",
+    "ipv6.stable-secret",
+];
+
 pub fn read_xml_file(path: PathBuf) -> Result<InterfacesResult, anyhow::Error> {
     let contents = match fs::read_to_string(path.clone()) {
         Ok(contents) => contents,
@@ -53,15 +66,25 @@ pub fn deserialize_xml(contents: String) -> Result<InterfacesResult, anyhow::Err
         netconfig_dhcp: None,
         warning: None,
     };
+
+    let unhandled_fields = unhandled_fields
+        .iter()
+        .filter(|e| {
+            let split_str = e.split_once('.').unwrap();
+            let ifc_name = &result.interfaces[split_str.0.parse::<usize>().unwrap()].name;
+            let field = split_str.1;
+
+            if IGNORED_FIELDS.binary_search(&field).is_ok() {
+                log::debug!("Ignored field in interface {ifc_name}: {field}");
+                false
+            } else {
+                log::warn!("Unhandled field in interface {ifc_name}: {field}");
+                true
+            }
+        })
+        .collect::<Vec<&String>>();
+
     if !unhandled_fields.is_empty() {
-        for unused_str in unhandled_fields {
-            let split_str = unused_str.split_once('.').unwrap();
-            log::warn!(
-                "Unhandled field in interface {}: {}",
-                result.interfaces[split_str.0.parse::<usize>().unwrap()].name,
-                split_str.1
-            );
-        }
         result.warning = Some(anyhow::anyhow!(
             "Unhandled fields, use the `--continue-migration` flag to ignore"
         ))
@@ -328,5 +351,17 @@ mod tests {
             .pop()
             .unwrap();
         assert_eq!(ifc.firewall.zone, Some("foo".to_string()));
+    }
+
+    #[test]
+    fn check_sort_of_ignored_fields() {
+        let mut i = 1;
+
+        while i < IGNORED_FIELDS.len() {
+            let a = IGNORED_FIELDS[i - 1].as_bytes();
+            let b = IGNORED_FIELDS[i].as_bytes();
+            assert!(a <= b);
+            i += 1;
+        }
     }
 }
