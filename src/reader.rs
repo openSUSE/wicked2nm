@@ -120,6 +120,51 @@ fn recurse_files(path: impl AsRef<Path>) -> std::io::Result<Vec<PathBuf>> {
     Ok(buf)
 }
 
+fn is_ifsysctl(file_name: &str) -> bool {
+    let invalid_suffix = [
+        "~",
+        ".old",
+        ".bak",
+        ".orig",
+        ".scpmbackup",
+        ".rpmnew",
+        ".rpmsave",
+        ".rpmorig",
+    ];
+
+    if !file_name.starts_with("ifsysctl") {
+        return false;
+    }
+
+    for suffix in invalid_suffix {
+        if file_name.ends_with(suffix) {
+            return false;
+        }
+    }
+
+    true
+}
+
+fn warn_on_deprecated_ifsysctl() -> Result<(), anyhow::Error> {
+    let settings = MIGRATION_SETTINGS.get().unwrap();
+
+    let entries = read_dir(&settings.netconfig_base_dir)?;
+    for entry in entries {
+        let entry = entry?;
+        let meta = entry.metadata()?;
+
+        if meta.is_dir() {
+            continue;
+        }
+        let file_name = entry.file_name().into_string().unwrap_or("".to_string());
+        if is_ifsysctl(&file_name) {
+            anyhow::bail!("ifsysctl file {file_name} is deprecated and will not be migrated");
+        }
+    }
+
+    Ok(())
+}
+
 pub fn read(paths: Vec<String>) -> Result<InterfacesResult, anyhow::Error> {
     let settings = MIGRATION_SETTINGS.get().unwrap();
 
@@ -167,6 +212,13 @@ pub fn read(paths: Vec<String>) -> Result<InterfacesResult, anyhow::Error> {
                 };
                 log::warn!("{msg}");
             }
+        };
+
+        if let Err(e) = warn_on_deprecated_ifsysctl() {
+            if !settings.continue_migration {
+                anyhow::bail!("{}, use the `--continue-migration` flag to ignore", e);
+            };
+            log::warn!("{e}");
         };
     }
 

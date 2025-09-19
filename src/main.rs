@@ -121,6 +121,7 @@ async fn run_command(cli: Cli) -> anyhow::Result<()> {
                     dry_run: false,
                     activate_connections: true,
                     with_netconfig: !cli.global_opts.without_netconfig,
+                    netconfig_base_dir: cli.global_opts.netconfig_base_dir,
                     netconfig_path: cli.global_opts.netconfig_path,
                     netconfig_dhcp_path: cli.global_opts.netconfig_dhcp_path,
                 })
@@ -160,6 +161,7 @@ async fn run_command(cli: Cli) -> anyhow::Result<()> {
                     dry_run,
                     activate_connections,
                     with_netconfig: !cli.global_opts.without_netconfig,
+                    netconfig_base_dir: cli.global_opts.netconfig_base_dir,
                     netconfig_path: cli.global_opts.netconfig_path,
                     netconfig_dhcp_path: cli.global_opts.netconfig_dhcp_path,
                 })
@@ -210,6 +212,7 @@ struct MigrationSettings {
     dry_run: bool,
     activate_connections: bool,
     with_netconfig: bool,
+    netconfig_base_dir: String,
     netconfig_path: String,
     netconfig_dhcp_path: String,
 }
@@ -221,6 +224,7 @@ impl Default for MigrationSettings {
             dry_run: false,
             activate_connections: true,
             with_netconfig: false,
+            netconfig_base_dir: "".to_string(),
             netconfig_path: "".to_string(),
             netconfig_dhcp_path: "".to_string(),
         }
