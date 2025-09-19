@@ -18,6 +18,7 @@ use migrate::migrate;
 use reader::read as wicked_read;
 use serde::Serialize;
 use simplelog::ConfigBuilder;
+use std::path::PathBuf;
 use std::process::{ExitCode, Termination};
 use tokio::sync::OnceCell;
 
@@ -42,10 +43,30 @@ struct GlobalOpts {
     #[arg(long, global = true, env = "W2NM_WITHOUT_NETCONFIG")]
     pub without_netconfig: bool,
 
-    #[arg(long, global = true, default_value_t = String::from("/etc/sysconfig/network/config"), env = "W2NM_NETCONFIG_PATH")]
+    // Base directory for ifcfg, ifsysctl and netconfig configuration files
+    #[arg(long, global = true, default_value_t = String::from("/etc/sysconfig/network/"), env = "W2NM_NETCONFIG_BASE_DIR")]
+    pub netconfig_base_dir: String,
+
+    /// Specify the path to the netconfig config file.
+    /// If not set, defaults to $W2NM_NETCONFIG_BASE_DIR/config
+    #[arg(
+        long,
+        global = true,
+        default_value = "",
+        hide_default_value = true,
+        env = "W2NM_NETCONFIG_PATH"
+    )]
     pub netconfig_path: String,
 
-    #[arg(long, global = true, default_value_t = String::from("/etc/sysconfig/network/dhcp"), env = "W2NM_NETCONFIG_DHCP_PATH")]
+    /// Specify the path to the netconfig dhcp config file.
+    /// If not set, defaults to $W2NM_NETCONFIG_BASE_DIR/dhcp
+    #[arg(
+        long,
+        global = true,
+        default_value = "",
+        hide_default_value = true,
+        env = "W2NM_NETCONFIG_DHCP_PATH"
+    )]
     pub netconfig_dhcp_path: String,
 }
 
@@ -100,6 +121,7 @@ async fn run_command(cli: Cli) -> anyhow::Result<()> {
                     dry_run: false,
                     activate_connections: true,
                     with_netconfig: !cli.global_opts.without_netconfig,
+                    netconfig_base_dir: cli.global_opts.netconfig_base_dir,
                     netconfig_path: cli.global_opts.netconfig_path,
                     netconfig_dhcp_path: cli.global_opts.netconfig_dhcp_path,
                 })
@@ -139,6 +161,7 @@ async fn run_command(cli: Cli) -> anyhow::Result<()> {
                     dry_run,
                     activate_connections,
                     with_netconfig: !cli.global_opts.without_netconfig,
+                    netconfig_base_dir: cli.global_opts.netconfig_base_dir,
                     netconfig_path: cli.global_opts.netconfig_path,
                     netconfig_dhcp_path: cli.global_opts.netconfig_dhcp_path,
                 })
@@ -189,6 +212,7 @@ struct MigrationSettings {
     dry_run: bool,
     activate_connections: bool,
     with_netconfig: bool,
+    netconfig_base_dir: String,
     netconfig_path: String,
     netconfig_dhcp_path: String,
 }
@@ -200,6 +224,7 @@ impl Default for MigrationSettings {
             dry_run: false,
             activate_connections: true,
             with_netconfig: false,
+            netconfig_base_dir: "".to_string(),
             netconfig_path: "".to_string(),
             netconfig_dhcp_path: "".to_string(),
         }
@@ -210,7 +235,15 @@ static MIGRATION_SETTINGS: OnceCell<MigrationSettings> = OnceCell::const_new();
 
 #[tokio::main]
 async fn main() -> CliResult {
-    let cli = Cli::parse();
+    let mut cli = Cli::parse();
+    let base_dir = PathBuf::from(&cli.global_opts.netconfig_base_dir);
+
+    if cli.global_opts.netconfig_path.is_empty() {
+        cli.global_opts.netconfig_path = base_dir.join("config").to_str().unwrap().to_string();
+    }
+    if cli.global_opts.netconfig_dhcp_path.is_empty() {
+        cli.global_opts.netconfig_dhcp_path = base_dir.join("dhcp").to_str().unwrap().to_string();
+    }
 
     let config = ConfigBuilder::new()
         .set_time_level(LevelFilter::Off)

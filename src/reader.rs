@@ -15,6 +15,19 @@ pub struct InterfacesResult {
     pub warning: Option<anyhow::Error>,
 }
 
+// Define a list of fields that are ignored if present.
+// The list must be in alphabetical order.
+pub const IGNORED_FIELDS: &[&str] = &[
+    "ipv4.arp-notify",
+    "ipv4.forwarding",
+    "ipv6.accept-dad",
+    "ipv6.accept-ra",
+    "ipv6.addr-gen-mode",
+    "ipv6.autoconf",
+    "ipv6.forwarding",
+    "ipv6.stable-secret",
+];
+
 pub fn read_xml_file(path: PathBuf) -> Result<InterfacesResult, anyhow::Error> {
     let contents = match fs::read_to_string(path.clone()) {
         Ok(contents) => contents,
@@ -53,15 +66,25 @@ pub fn deserialize_xml(contents: String) -> Result<InterfacesResult, anyhow::Err
         netconfig_dhcp: None,
         warning: None,
     };
+
+    let unhandled_fields = unhandled_fields
+        .iter()
+        .filter(|e| {
+            let split_str = e.split_once('.').unwrap();
+            let ifc_name = &result.interfaces[split_str.0.parse::<usize>().unwrap()].name;
+            let field = split_str.1;
+
+            if IGNORED_FIELDS.binary_search(&field).is_ok() {
+                log::debug!("Ingnore field in interface {ifc_name}: {field}");
+                false
+            } else {
+                log::warn!("Unhandled field in interface {ifc_name}: {field}");
+                true
+            }
+        })
+        .collect::<Vec<&String>>();
+
     if !unhandled_fields.is_empty() {
-        for unused_str in unhandled_fields {
-            let split_str = unused_str.split_once('.').unwrap();
-            log::warn!(
-                "Unhandled field in interface {}: {}",
-                result.interfaces[split_str.0.parse::<usize>().unwrap()].name,
-                split_str.1
-            );
-        }
         result.warning = Some(anyhow::anyhow!(
             "Unhandled fields, use the `--continue-migration` flag to ignore"
         ))
@@ -97,6 +120,51 @@ fn recurse_files(path: impl AsRef<Path>) -> std::io::Result<Vec<PathBuf>> {
     Ok(buf)
 }
 
+fn is_ifsysctl(file_name: &str) -> bool {
+    let invalid_suffix = [
+        "~",
+        ".old",
+        ".bak",
+        ".orig",
+        ".scpmbackup",
+        ".rpmnew",
+        ".rpmsave",
+        ".rpmorig",
+    ];
+
+    if !file_name.starts_with("ifsysctl") {
+        return false;
+    }
+
+    for suffix in invalid_suffix {
+        if file_name.ends_with(suffix) {
+            return false;
+        }
+    }
+
+    true
+}
+
+fn warn_on_deprecated_ifsysctl() -> Result<(), anyhow::Error> {
+    let settings = MIGRATION_SETTINGS.get().unwrap();
+
+    let entries = read_dir(&settings.netconfig_base_dir)?;
+    for entry in entries {
+        let entry = entry?;
+        let meta = entry.metadata()?;
+
+        if meta.is_dir() {
+            continue;
+        }
+        let file_name = entry.file_name().into_string().unwrap_or("".to_string());
+        if is_ifsysctl(&file_name) {
+            anyhow::bail!("ifsysctl file {file_name} is deprecated and will not be migrated");
+        }
+    }
+
+    Ok(())
+}
+
 pub fn read(paths: Vec<String>) -> Result<InterfacesResult, anyhow::Error> {
     let settings = MIGRATION_SETTINGS.get().unwrap();
 
@@ -110,16 +178,28 @@ pub fn read(paths: Vec<String>) -> Result<InterfacesResult, anyhow::Error> {
         match read_netconfig(settings.netconfig_path.clone()) {
             Ok(netconfig) => result.netconfig = netconfig,
             Err(e) => {
-                let msg = format!(
+                anyhow::bail!(
                     "Failed to read netconfig at {}: {}",
-                    settings.netconfig_path, e
+                    settings.netconfig_path,
+                    e
                 );
-                if !settings.continue_migration {
-                    anyhow::bail!("{}, use the `--continue-migration` flag to ignore", msg);
-                };
-                log::warn!("{msg}");
             }
         };
+        if let Some(nc) = &result.netconfig {
+            if !nc.warnings.is_empty() {
+                for msg in &nc.warnings {
+                    log::warn!("{}: {msg}", settings.netconfig_path);
+                }
+
+                if !settings.continue_migration {
+                    anyhow::bail!(
+                        "{} parse errors, use the `--continue-migration` flag to ignore",
+                        settings.netconfig_path
+                    );
+                };
+            }
+        }
+
         match read_netconfig_dhcp(settings.netconfig_dhcp_path.clone()) {
             Ok(netconfig_dhcp) => result.netconfig_dhcp = Some(netconfig_dhcp),
             Err(e) => {
@@ -132,6 +212,13 @@ pub fn read(paths: Vec<String>) -> Result<InterfacesResult, anyhow::Error> {
                 };
                 log::warn!("{msg}");
             }
+        };
+
+        if let Err(e) = warn_on_deprecated_ifsysctl() {
+            if !settings.continue_migration {
+                anyhow::bail!("{}, use the `--continue-migration` flag to ignore", e);
+            };
+            log::warn!("{e}");
         };
     }
 
@@ -328,5 +415,17 @@ mod tests {
             .pop()
             .unwrap();
         assert_eq!(ifc.firewall.zone, Some("foo".to_string()));
+    }
+
+    #[test]
+    fn check_sort_of_ignored_fields() {
+        let mut i = 1;
+
+        while i < IGNORED_FIELDS.len() {
+            let a = IGNORED_FIELDS[i - 1].as_bytes();
+            let b = IGNORED_FIELDS[i].as_bytes();
+            assert!(a <= b);
+            i += 1;
+        }
     }
 }
