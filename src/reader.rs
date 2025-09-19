@@ -99,7 +99,7 @@ fn replace_colons(colon_string: &str) -> String {
 }
 
 // https://stackoverflow.com/a/76820878
-fn recurse_files(path: impl AsRef<Path>) -> std::io::Result<Vec<PathBuf>> {
+fn list_files(path: impl AsRef<Path>, recursive: bool) -> std::io::Result<Vec<PathBuf>> {
     let mut buf = vec![];
     let entries = read_dir(path)?;
 
@@ -107,8 +107,8 @@ fn recurse_files(path: impl AsRef<Path>) -> std::io::Result<Vec<PathBuf>> {
         let entry = entry?;
         let meta = entry.metadata()?;
 
-        if meta.is_dir() {
-            let mut subdir = recurse_files(entry.path())?;
+        if meta.is_dir() && recursive {
+            let mut subdir = list_files(entry.path(), recursive)?;
             buf.append(&mut subdir);
         }
 
@@ -118,6 +118,43 @@ fn recurse_files(path: impl AsRef<Path>) -> std::io::Result<Vec<PathBuf>> {
     }
 
     Ok(buf)
+}
+
+fn is_ifsysctl(path: &Path) -> bool {
+    let invalid_suffix = [
+        "~",
+        ".old",
+        ".bak",
+        ".orig",
+        ".scpmbackup",
+        ".rpmnew",
+        ".rpmsave",
+        ".rpmorig",
+    ];
+
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .map(|filename| {
+            filename.starts_with("ifsysctl")
+                && !invalid_suffix.iter().any(|e| filename.ends_with(e))
+        })
+        .unwrap_or(false)
+}
+
+fn warn_on_deprecated_ifsysctl() -> Result<(), anyhow::Error> {
+    let settings = MIGRATION_SETTINGS.get().unwrap();
+
+    let files = list_files(&settings.netconfig_base_dir, false)?;
+    for file in files {
+        if is_ifsysctl(&file) {
+            anyhow::bail!(
+                "ifsysctl file \"{}\" is deprecated and will not be migrated",
+                file.display()
+            );
+        }
+    }
+
+    Ok(())
 }
 
 pub fn read(paths: Vec<String>) -> Result<InterfacesResult, anyhow::Error> {
@@ -169,6 +206,13 @@ pub fn read(paths: Vec<String>) -> Result<InterfacesResult, anyhow::Error> {
                 log::warn!("{msg}");
             }
         };
+
+        if let Err(e) = warn_on_deprecated_ifsysctl() {
+            if !settings.continue_migration {
+                anyhow::bail!("{}, use the `--continue-migration` flag to ignore", e);
+            };
+            log::warn!("{e}");
+        };
     }
 
     // Filter loopback as it doesn't need to be migrated
@@ -188,7 +232,7 @@ fn read_files(file_paths: Vec<String>) -> Result<InterfacesResult, anyhow::Error
     for path in file_paths {
         let path: PathBuf = path.into();
         if path.is_dir() {
-            let files = recurse_files(path)?;
+            let files = list_files(path, true)?;
             for file in files {
                 match file.extension() {
                     None => continue,
