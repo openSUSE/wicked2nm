@@ -9,6 +9,8 @@ interface-name=eth9
 [match]
 
 [ipv4]
+dhcp-client-id=ipv6-duid
+dhcp-iaid=mac
 dhcp-send-hostname-deprecated=false
 dhcp-send-hostname=0
 dhcp-send-release=0
@@ -16,6 +18,8 @@ method=auto
 
 [ipv6]
 addr-gen-mode=default
+dhcp-duid=llt
+dhcp-iaid=mac
 dhcp-send-hostname-deprecated=false
 dhcp-send-hostname=0
 dhcp-send-release=0

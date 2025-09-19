@@ -18,8 +18,8 @@
     <privacy>prefer-public</privacy>
   </ipv6>
 </interface>
-<interface origin="compat:suse:/tests/ovs-bridge1.1/netconfig/ifcfg-tap10">
-  <name>tap10</name>
+<interface origin="compat:suse:/tests/ovs-bridge1.1/netconfig/ifcfg-tap20">
+  <name>tap20</name>
   <control>
     <mode>boot</mode>
   </control>
@@ -38,8 +38,8 @@
     <enabled>false</enabled>
   </ipv6>
 </interface>
-<interface origin="compat:suse:/tests/ovs-bridge1.1/netconfig/ifcfg-tap20">
-  <name>tap20</name>
+<interface origin="compat:suse:/tests/ovs-bridge1.1/netconfig/ifcfg-tap10">
+  <name>tap10</name>
   <control>
     <mode>boot</mode>
   </control>

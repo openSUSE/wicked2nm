@@ -14,6 +14,8 @@ method=disabled
 
 [ipv6]
 addr-gen-mode=default
+dhcp-duid=llt
+dhcp-iaid=mac
 dhcp-send-hostname=1
 dhcp-send-release=0
 ignore-auto-dns=true
