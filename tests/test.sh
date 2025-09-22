@@ -247,13 +247,20 @@ for test_dir in ${TEST_DIRS}; do
     fi
 
     log_verbose "RUN: $MIGRATE_WICKED_BIN migrate $test_dir/wicked_xml"
-    $MIGRATE_WICKED_BIN migrate ./wicked_xml
-    if [ $? -ne 0 ] && [ "$TEST_EXPECT_FAIL" = false ]; then
-        error_msg ${test_dir} "migration failed"
-        FAILED_TESTS+=("${test_dir}::migrate")
-        continue
-    elif [ $? -ne 0 ] && [ "$TEST_EXPECT_FAIL" = true ]; then
-        echo -e "${GREEN}Migration for $test_dir failed as expected${NC}"
+    if $MIGRATE_WICKED_BIN migrate ./wicked_xml; then
+      if [ "$TEST_EXPECT_FAIL" = true ]; then
+          error_msg ${test_dir} "migration succeeded but test expected fail"
+          FAILED_TESTS+=("${test_dir}::migrate")
+          continue
+      fi
+    else 
+      if [ "$TEST_EXPECT_FAIL" = false ]; then
+          error_msg ${test_dir} "migration failed"
+          FAILED_TESTS+=("${test_dir}::migrate")
+          continue
+      else
+          echo -e "${GREEN}Migration for $test_dir failed as expected${NC}"
+      fi
     fi
 
     if [ -d "./system-connections" ]; then
