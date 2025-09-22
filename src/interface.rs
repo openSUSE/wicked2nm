@@ -622,43 +622,47 @@ impl Interface {
             }
         }
 
-        let mut dhcp4_settings: Option<Dhcp4Settings> = None;
+        let mut dhcp4_settings: Dhcp4Settings = Dhcp4Settings::default();
+        let mut dhcp6_settings: Dhcp6Settings = Dhcp6Settings::default();
+
         if let Some(ipv4_dhcp) = &self.ipv4_dhcp {
-            let mut dhcp_settings = Dhcp4Settings::default();
             if let Some(hostname) = &ipv4_dhcp.hostname {
-                dhcp_settings.send_hostname = Some(true);
+                dhcp4_settings.send_hostname = Some(true);
                 if let Some(netconfig_dhcp) = netconfig_dhcp {
                     if netconfig_dhcp.dhclient_hostname_option != HostnameOption::Auto {
-                        dhcp_settings.hostname = Some(hostname.clone());
+                        dhcp4_settings.hostname = Some(hostname.clone());
                     }
                 } else {
-                    dhcp_settings.hostname = Some(hostname.clone());
+                    dhcp4_settings.hostname = Some(hostname.clone());
                 }
             } else {
-                dhcp_settings.send_hostname = Some(false);
+                dhcp4_settings.send_hostname = Some(false);
             }
-            dhcp_settings.send_release = Some(ipv4_dhcp.release_lease);
-            dhcp4_settings = Some(dhcp_settings);
+            dhcp4_settings.send_release = Some(ipv4_dhcp.release_lease);
+            dhcp4_settings.client_id = model::DhcpClientId::Ipv6Duid;
+            dhcp4_settings.iaid = model::DhcpIaid::Mac;
+            dhcp6_settings.duid = model::DhcpDuid::Llt;
         }
+        let dhcp4_settings: Option<Dhcp4Settings> = Some(dhcp4_settings);
 
-        let mut dhcp6_settings: Option<Dhcp6Settings> = None;
         if let Some(ipv6_dhcp) = &self.ipv6_dhcp {
-            let mut dhcp_settings = Dhcp6Settings::default();
             if let Some(hostname) = &ipv6_dhcp.hostname {
-                dhcp_settings.send_hostname = Some(true);
+                dhcp6_settings.send_hostname = Some(true);
                 if let Some(netconfig_dhcp) = netconfig_dhcp {
                     if netconfig_dhcp.dhclient6_hostname_option != HostnameOption::Auto {
-                        dhcp_settings.hostname = Some(hostname.clone());
+                        dhcp6_settings.hostname = Some(hostname.clone());
                     }
                 } else {
-                    dhcp_settings.hostname = Some(hostname.clone());
+                    dhcp6_settings.hostname = Some(hostname.clone());
                 }
             } else {
-                dhcp_settings.send_hostname = Some(false);
+                dhcp6_settings.send_hostname = Some(false);
             }
-            dhcp_settings.send_release = Some(ipv6_dhcp.release_lease);
-            dhcp6_settings = Some(dhcp_settings);
+            dhcp6_settings.send_release = Some(ipv6_dhcp.release_lease);
+            dhcp6_settings.iaid = model::DhcpIaid::Mac;
+            dhcp6_settings.duid = model::DhcpDuid::Llt;
         }
+        let dhcp6_settings: Option<Dhcp6Settings> = Some(dhcp6_settings);
 
         let mut ip6_privacy: Option<i32> = None;
         if let Some(privacy) = &self.ipv6.privacy {
