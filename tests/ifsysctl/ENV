@@ -1,0 +1,2 @@
+W2NM_NETCONFIG_BASE_DIR=./netconfig
+TEST_EXPECT_FAIL=true
