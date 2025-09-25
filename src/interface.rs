@@ -697,11 +697,11 @@ impl TryFrom<&Route> for IpRoute {
                 next_hop = Some(IpAddr::from_str(&nexthops[0].gateway).unwrap());
             }
         }
-        let destination = if route.destination.is_some() {
-            IpInet::from_str(route.destination.clone().unwrap().as_str())?
-        } else if next_hop.is_some() {
+        let destination = if let Some(destination) = &route.destination {
+            IpInet::from_str(destination)?
+        } else if let Some(next_hop) = next_hop {
             // default route
-            let default_ip = if next_hop.unwrap().is_ipv4() {
+            let default_ip = if next_hop.is_ipv4() {
                 IpAddr::from_str("0.0.0.0")?
             } else {
                 IpAddr::from_str("::")?
