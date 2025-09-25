@@ -30,14 +30,17 @@ fn handle_netconfig_values() -> Result<Option<Netconfig>, anyhow::Error> {
                     .warnings
                     .push("NETCONFIG_DNS_POLICY \"STATIC_FALLBACK\" is not supported".to_string());
             } else {
-                netconfig.dns_policy = dns_policy.split(' ').map(|s| s.to_string()).collect();
+                netconfig.dns_policy = dns_policy
+                    .split_ascii_whitespace()
+                    .map(|s| s.to_string())
+                    .collect();
             }
         }
     }
     if let Ok(static_dns_servers) = dotenv::var("NETCONFIG_DNS_STATIC_SERVERS") {
         if !static_dns_servers.is_empty() {
             netconfig.static_dns_servers = static_dns_servers
-                .split_whitespace()
+                .split_ascii_whitespace()
                 .filter_map(|ip_str| match ip_str.parse::<IpAddr>() {
                     Ok(x) => Some(x),
                     Err(_e) => {
@@ -54,7 +57,7 @@ fn handle_netconfig_values() -> Result<Option<Netconfig>, anyhow::Error> {
         if !static_dns_searchlist.is_empty() {
             netconfig.static_dns_searchlist = Some(
                 static_dns_searchlist
-                    .split(' ')
+                    .split_ascii_whitespace()
                     .map(|s| s.to_string())
                     .collect::<Vec<String>>(),
             );
