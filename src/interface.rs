@@ -464,14 +464,20 @@ impl Interface {
             }
         } else if let Some(infiniband) = &self.infiniband {
             if infiniband.multicast.is_some() {
-                log::warn!("Infiniband multicast isn't supported by NetworkManager");
+                log::warn!(
+                    "Infiniband multicast in {} isn't supported by NetworkManager",
+                    self.name
+                );
                 connection_result.has_warnings = true;
             }
             connection.config = infiniband.into();
             connection_result.connections.push(connection);
         } else if let Some(infiniband_child) = &self.infiniband_child {
             if infiniband_child.multicast.is_some() {
-                log::warn!("Infiniband multicast isn't supported by NetworkManager");
+                log::warn!(
+                    "Infiniband multicast in {} isn't supported by NetworkManager",
+                    self.name
+                );
                 connection_result.has_warnings = true;
             }
             connection.config = infiniband_child.into();
@@ -556,7 +562,12 @@ impl Interface {
                     let local_addr = match IpInet::from_str(addr.local.as_str()) {
                         Ok(address) => address,
                         Err(e) => {
-                            anyhow::bail!("Failed to parse address \"{}\": {}", addr.local, e)
+                            anyhow::bail!(
+                                "Failed to parse address \"{}\" for {}: {}",
+                                addr.local,
+                                self.name,
+                                e
+                            )
                         }
                     };
                     if let Some(broadcast) = &addr.broadcast {
@@ -564,8 +575,9 @@ impl Interface {
                             Ok(address) => address,
                             Err(e) => {
                                 anyhow::bail!(
-                                    "Failed to parse broadcast address \"{}\": {}",
+                                    "Failed to parse broadcast address \"{}\" for {}: {}",
                                     broadcast,
+                                    self.name,
                                     e
                                 )
                             }
@@ -587,7 +599,7 @@ impl Interface {
                     routes4.push(match route.try_into() {
                         Ok(route) => route,
                         Err(e) => {
-                            log::warn!("{e}");
+                            log::warn!("Failed parsing ipv4 route for {}: {}", self.name, e);
                             ipconfig_result.has_warnings = true;
                             continue;
                         }
@@ -601,7 +613,12 @@ impl Interface {
                     addresses.push(match IpInet::from_str(addr.local.as_str()) {
                         Ok(address) => address,
                         Err(e) => {
-                            anyhow::bail!("Failed to parse address \"{}\": {}", addr.local, e)
+                            anyhow::bail!(
+                                "Failed to parse address \"{}\" for {}: {}",
+                                addr.local,
+                                self.name,
+                                e
+                            )
                         }
                     });
                 }
@@ -611,7 +628,7 @@ impl Interface {
                     routes6.push(match route.try_into() {
                         Ok(route) => route,
                         Err(e) => {
-                            log::warn!("{e}");
+                            log::warn!("Failed parsing ipv6 route for {}: {}", self.name, e);
                             ipconfig_result.has_warnings = true;
                             continue;
                         }
@@ -706,7 +723,9 @@ impl TryFrom<&Route> for IpRoute {
             };
             IpInet::new(default_ip, 0)?
         } else {
-            return Err(anyhow::anyhow!("Error occurred when parsing route"));
+            return Err(anyhow::anyhow!(
+                "Route contains neither destination nor next-hop"
+            ));
         };
         let metric = route.priority;
         Ok(IpRoute {
@@ -1039,9 +1058,9 @@ mod tests {
         };
         assert!(has_unhandled_field(&ifc));
         testing_logger::validate(|captured_logs| {
-            for l in captured_logs {
-                println!("{:?}", l.body);
-            }
+            captured_logs
+                .iter()
+                .for_each(|f| println!("[{}] {}", f.level, f.body));
             assert_eq!(
                 captured_logs
                     .iter()
