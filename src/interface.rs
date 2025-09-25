@@ -709,7 +709,7 @@ impl TryFrom<&Route> for IpRoute {
                     "Multipath routing isn't natively supported by NetworkManager"
                 ));
             } else {
-                next_hop = Some(IpAddr::from_str(&nexthops[0].gateway).unwrap());
+                next_hop = Some(IpAddr::from_str(&nexthops[0].gateway)?);
             }
         }
         let destination = if let Some(destination) = &route.destination {
