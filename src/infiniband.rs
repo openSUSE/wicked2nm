@@ -106,6 +106,7 @@ mod tests {
                 pkey: 0x8001,
                 device: "ib0".to_string(),
             }),
+            name: "ib0".to_string(),
             ..Default::default()
         };
 
@@ -121,7 +122,7 @@ mod tests {
             assert_eq!(captured_logs.len(), 1);
             assert_eq!(
                 captured_logs[0].body,
-                "Infiniband multicast isn't supported by NetworkManager"
+                "Infiniband multicast in ib0 isn't supported by NetworkManager"
             );
         });
 
