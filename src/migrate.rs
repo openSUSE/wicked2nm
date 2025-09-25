@@ -1,10 +1,7 @@
-use crate::interface::{Interface, Link, LinkPort, LinkPortType};
+use crate::interface::{ConnectionResult, Link, LinkPort, LinkPortType};
 use crate::netconfig::{apply_dns_policy, Netconfig};
-use crate::netconfig_dhcp::NetconfigDhcp;
-use crate::MIGRATION_SETTINGS;
-use agama_network::model::{
-    Connection, ConnectionConfig, GeneralState, IpConfig, MatchConfig, StateConfig,
-};
+use crate::reader::InterfacesResult;
+use agama_network::model::{Connection, ConnectionConfig, IpConfig, MatchConfig, StateConfig};
 use agama_network::{model, Adapter, NetworkManagerAdapter, NetworkState};
 use cidr::IpInet;
 use std::fmt;
@@ -59,21 +56,22 @@ fn get_parentmatch_ovsbridge(
 }
 
 fn update_parent_connection(
-    connections: &mut [Connection],
+    cresult: &mut ConnectionResult,
     parents: &mut HashMap<Uuid, Link>,
 ) -> Result<(), anyhow::Error> {
-    let settings = MIGRATION_SETTINGS.get().unwrap();
     let mut parent_uuids: HashMap<Uuid, ParentMatch> = HashMap::new();
 
     for (port_uuid, parent) in parents.iter() {
-        let Some(parent_con) = connections.iter().find(|c| c.interface == parent.master) else {
+        let Some(parent_con) = cresult
+            .connections
+            .iter()
+            .find(|c| c.interface == parent.master)
+        else {
             log::warn!(
                 "Missing parent connection with interface {} for port {port_uuid}",
                 parent.clone().master.unwrap()
             );
-            if !settings.continue_migration {
-                anyhow::bail!("Migration of {port_uuid} failed because of warnings, use the `--continue-migration` flag to ignore");
-            }
+            cresult.has_warnings = true;
             continue;
         };
 
@@ -82,7 +80,7 @@ fn update_parent_connection(
         };
 
         if let Some(parent_match) = match port.port_type {
-            LinkPortType::OvsBridge => get_parentmatch_ovsbridge(parent_con, connections),
+            LinkPortType::OvsBridge => get_parentmatch_ovsbridge(parent_con, &cresult.connections),
             _ => Some(ParentMatch::from(parent_con.uuid)),
         } {
             parent_uuids.insert(*port_uuid, parent_match);
@@ -90,7 +88,7 @@ fn update_parent_connection(
     }
 
     for (port_uuid, parent_match) in parent_uuids {
-        let Some(connection) = connections.iter_mut().find(|c| c.uuid == port_uuid) else {
+        let Some(connection) = cresult.connections.iter_mut().find(|c| c.uuid == port_uuid) else {
             anyhow::bail!(
                 "Unexpected failure - missing port connection {port_uuid} from parent {parent_match}"
             );
@@ -129,31 +127,26 @@ fn create_lo_connection() -> Connection {
     }
 }
 
-pub async fn migrate(
-    interfaces: Vec<Interface>,
-    netconfig: Option<Netconfig>,
-    netconfig_dhcp: Option<NetconfigDhcp>,
-) -> Result<(), Box<dyn Error>> {
-    let settings = MIGRATION_SETTINGS.get().unwrap();
+#[derive(Default)]
+pub struct NetworkStateResult {
+    pub network_state: NetworkState,
+    pub has_warnings: bool,
+}
+
+pub fn to_networkstate(
+    interface_result: &InterfacesResult,
+) -> Result<NetworkStateResult, anyhow::Error> {
     let mut parents: HashMap<Uuid, Link> = HashMap::new();
-    let mut connections: Vec<Connection> = vec![];
+    let mut connection_result: ConnectionResult = ConnectionResult {
+        has_warnings: interface_result.has_warnings,
+        ..Default::default()
+    };
 
-    for interface in interfaces {
-        let connection_result = interface.to_connection(&netconfig_dhcp)?;
-        if !connection_result.warnings.is_empty() {
-            for connection_error in &connection_result.warnings {
-                log::warn!("{connection_error}");
-            }
-            if !settings.continue_migration {
-                return Err(anyhow::anyhow!(
-                    "Migration of {} failed because of warnings, use the `--continue-migration` flag to ignore",
-                    connection_result.connections[0].id
-                )
-                .into());
-            }
-        }
+    for interface in &interface_result.interfaces {
+        let ifc_connection_result = interface.to_connection(&interface_result.netconfig_dhcp)?;
+        connection_result.has_warnings |= ifc_connection_result.has_warnings;
 
-        for connection in connection_result.connections {
+        for connection in ifc_connection_result.connections {
             if connection.controller.is_none() {
                 if interface.link.master.is_some() {
                     parents.insert(connection.uuid, interface.link.clone());
@@ -187,7 +180,7 @@ pub async fn migrate(
                     }
                 }
             }
-            connections.push(connection);
+            connection_result.connections.push(connection);
         }
     }
 
@@ -197,36 +190,41 @@ pub async fn migrate(
         // to the same "ovs-bridge".
         //
         let len = parents.len();
-        update_parent_connection(&mut connections, &mut parents)?;
+        update_parent_connection(&mut connection_result, &mut parents)?;
         if parents.is_empty() {
             break;
         }
 
         if len == parents.len() {
-            let connections = connections
+            let connections = connection_result
+                .connections
                 .iter()
                 .filter(|c| parents.contains_key(&c.uuid))
                 .map(|c| c.id.as_str())
                 .collect::<Vec<&str>>()
                 .join("\n");
-            return Err(anyhow::anyhow!(
-                "Unexpected error, port connection is missing controller: {connections}"
-            )
-            .into());
+            anyhow::bail!("Unexpected error, port connection is missing controller: {connections}");
         }
     }
 
-    let mut state = NetworkState::new(GeneralState::default(), vec![], vec![], vec![]);
-    for connection in &connections {
-        state.add_connection(connection.clone())?;
+    let mut state_result = NetworkStateResult {
+        has_warnings: connection_result.has_warnings,
+        ..Default::default()
+    };
+
+    for connection in &connection_result.connections {
+        state_result
+            .network_state
+            .add_connection(connection.clone())?;
     }
 
-    if settings.dry_run {
-        for connection in state.connections {
-            log::debug!("{connection:#?}");
-        }
-        return Ok(());
-    }
+    Ok(state_result)
+}
+
+pub async fn apply_networkstate(
+    state: &mut NetworkState,
+    netconfig: Option<Netconfig>,
+) -> Result<(), Box<dyn Error>> {
     let nm = NetworkManagerAdapter::from_system().await?;
 
     if let Some(netconfig) = netconfig {
@@ -243,7 +241,7 @@ pub async fn migrate(
 
         state.add_connection(loopback)?;
 
-        apply_dns_policy(&netconfig, &mut state)?;
+        apply_dns_policy(&netconfig, state)?;
 
         // When a connection didn't get a dns priority it means it wasn't matched by the netconfig policy,
         // so ignore-auto-dns should be set to true.
@@ -257,6 +255,6 @@ pub async fn migrate(
         }
     }
 
-    nm.write(&state).await?;
+    nm.write(state).await?;
     Ok(())
 }

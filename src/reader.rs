@@ -12,7 +12,7 @@ pub struct InterfacesResult {
     pub interfaces: Vec<Interface>,
     pub netconfig: Option<Netconfig>,
     pub netconfig_dhcp: Option<NetconfigDhcp>,
-    pub warning: Option<anyhow::Error>,
+    pub has_warnings: bool,
 }
 
 // Define a list of fields that are ignored if present.
@@ -64,31 +64,22 @@ pub fn deserialize_xml(contents: String) -> Result<InterfacesResult, anyhow::Err
         interfaces,
         netconfig: None,
         netconfig_dhcp: None,
-        warning: None,
+        has_warnings: false,
     };
 
-    let unhandled_fields = unhandled_fields
-        .iter()
-        .filter(|e| {
-            let split_str = e.split_once('.').unwrap();
-            let ifc_name = &result.interfaces[split_str.0.parse::<usize>().unwrap()].name;
-            let field = split_str.1;
+    for e in unhandled_fields {
+        let split_str = e.split_once('.').unwrap();
+        let ifc_name = &result.interfaces[split_str.0.parse::<usize>().unwrap()].name;
+        let field = split_str.1;
 
-            if IGNORED_FIELDS.binary_search(&field).is_ok() {
-                log::debug!("Ignored field in interface {ifc_name}: {field}");
-                false
-            } else {
-                log::warn!("Unhandled field in interface {ifc_name}: {field}");
-                true
-            }
-        })
-        .collect::<Vec<&String>>();
-
-    if !unhandled_fields.is_empty() {
-        result.warning = Some(anyhow::anyhow!(
-            "Unhandled fields, use the `--continue-migration` flag to ignore"
-        ))
+        if IGNORED_FIELDS.binary_search(&field).is_ok() {
+            log::debug!("Ingnore field in interface {ifc_name}: {field}");
+        } else {
+            log::warn!("Unhandled field in interface {ifc_name}: {field}");
+            result.has_warnings = true;
+        }
     }
+
     Ok(result)
 }
 
@@ -141,20 +132,22 @@ fn is_ifsysctl(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-fn warn_on_deprecated_ifsysctl() -> Result<(), anyhow::Error> {
+fn warn_on_deprecated_ifsysctl() -> Result<bool, anyhow::Error> {
     let settings = MIGRATION_SETTINGS.get().unwrap();
+    let mut has_warning = false;
 
     let files = list_files(&settings.netconfig_base_dir, false)?;
     for file in files {
         if is_ifsysctl(&file) {
-            anyhow::bail!(
+            log::warn!(
                 "ifsysctl file \"{}\" is deprecated and will not be migrated",
                 file.display()
             );
+            has_warning = true;
         }
     }
 
-    Ok(())
+    Ok(has_warning)
 }
 
 pub fn read(paths: Vec<String>) -> Result<InterfacesResult, anyhow::Error> {
@@ -168,7 +161,10 @@ pub fn read(paths: Vec<String>) -> Result<InterfacesResult, anyhow::Error> {
 
     if settings.with_netconfig {
         match read_netconfig(settings.netconfig_path.clone()) {
-            Ok(netconfig) => result.netconfig = netconfig,
+            Ok(netconfig) => {
+                result.has_warnings |= netconfig.has_warning;
+                result.netconfig = Some(netconfig);
+            }
             Err(e) => {
                 anyhow::bail!(
                     "Failed to read netconfig at {}: {}",
@@ -177,41 +173,24 @@ pub fn read(paths: Vec<String>) -> Result<InterfacesResult, anyhow::Error> {
                 );
             }
         };
-        if let Some(nc) = &result.netconfig {
-            if !nc.warnings.is_empty() {
-                for msg in &nc.warnings {
-                    log::warn!("{}: {msg}", settings.netconfig_path.display());
-                }
 
-                if !settings.continue_migration {
-                    anyhow::bail!(
-                        "{} parse errors, use the `--continue-migration` flag to ignore",
-                        settings.netconfig_path.display()
-                    );
-                };
+        match read_netconfig_dhcp(&settings.netconfig_dhcp_path) {
+            Ok(netconfig_dhcp) => {
+                result.has_warnings |= netconfig_dhcp.has_warning;
+                result.netconfig_dhcp = Some(netconfig_dhcp);
             }
-        }
-
-        match read_netconfig_dhcp(settings.netconfig_dhcp_path.clone()) {
-            Ok(netconfig_dhcp) => result.netconfig_dhcp = Some(netconfig_dhcp),
             Err(e) => {
-                let msg = format!(
+                anyhow::bail!(
                     "Failed to read netconfig_dhcp at {}: {}",
                     settings.netconfig_dhcp_path.display(),
                     e
-                );
-                if !settings.continue_migration {
-                    anyhow::bail!("{}, use the `--continue-migration` flag to ignore", msg);
-                };
-                log::warn!("{msg}");
+                )
             }
         };
 
-        if let Err(e) = warn_on_deprecated_ifsysctl() {
-            if !settings.continue_migration {
-                anyhow::bail!("{}, use the `--continue-migration` flag to ignore", e);
-            };
-            log::warn!("{e}");
+        match warn_on_deprecated_ifsysctl() {
+            Err(e) => anyhow::bail!("Unexpected error, while searching ifsysctl files: {}", e),
+            Ok(has_warnings) => result.has_warnings |= has_warnings,
         };
     }
 
@@ -226,7 +205,7 @@ fn read_files(file_paths: Vec<String>) -> Result<InterfacesResult, anyhow::Error
         interfaces: vec![],
         netconfig: None,
         netconfig_dhcp: None,
-        warning: None,
+        has_warnings: false,
     };
 
     for path in file_paths {
@@ -243,16 +222,12 @@ fn read_files(file_paths: Vec<String>) -> Result<InterfacesResult, anyhow::Error
                     }
                 }
                 let mut read_xml = read_xml_file(file)?;
-                if result.warning.is_none() && read_xml.warning.is_some() {
-                    result.warning = read_xml.warning
-                }
+                result.has_warnings |= read_xml.has_warnings;
                 result.interfaces.append(&mut read_xml.interfaces);
             }
         } else {
             let mut read_xml = read_xml_file(path)?;
-            if result.warning.is_none() && read_xml.warning.is_some() {
-                result.warning = read_xml.warning
-            }
+            result.has_warnings |= read_xml.has_warnings;
             result.interfaces.append(&mut read_xml.interfaces);
         }
     }

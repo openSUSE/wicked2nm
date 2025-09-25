@@ -109,15 +109,21 @@ mod tests {
             ..Default::default()
         };
 
+        testing_logger::setup();
+
         let connections = infiniband_child_interface.to_connection(&None);
         assert!(connections.is_ok());
 
         // Check multicast warning is generated
-        assert_eq!(connections.as_ref().unwrap().warnings.len(), 1);
-        assert_eq!(
-            connections.as_ref().unwrap().warnings[0].to_string(),
-            "Infiniband multicast isn't supported by NetworkManager"
-        );
+        assert!(connections.as_ref().unwrap().has_warnings);
+
+        testing_logger::validate(|captured_logs| {
+            assert_eq!(captured_logs.len(), 1);
+            assert_eq!(
+                captured_logs[0].body,
+                "Infiniband multicast isn't supported by NetworkManager"
+            );
+        });
 
         let connection = &connections.unwrap().connections[0];
         let model::ConnectionConfig::Infiniband(infiniband_child) = &connection.config else {

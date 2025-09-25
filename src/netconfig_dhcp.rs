@@ -5,6 +5,7 @@ use std::path::Path;
 pub struct NetconfigDhcp {
     pub dhclient_hostname_option: HostnameOption,
     pub dhclient6_hostname_option: HostnameOption,
+    pub has_warning: bool,
 }
 
 #[derive(Default, Debug, PartialEq, Serialize)]
@@ -25,9 +26,16 @@ impl From<String> for HostnameOption {
     }
 }
 
-pub fn read_netconfig_dhcp(path: impl AsRef<Path>) -> Result<NetconfigDhcp, anyhow::Error> {
+pub fn read_netconfig_dhcp(path: &Path) -> Result<NetconfigDhcp, anyhow::Error> {
+    if !path.exists() {
+        log::warn!("Missing netconfig dhcp file {}", path.display());
+        return Ok(NetconfigDhcp {
+            has_warning: true,
+            ..Default::default()
+        });
+    }
     if let Err(e) = dotenv::from_filename(path) {
-        return Err(e.into());
+        anyhow::bail!(e);
     };
     Ok(handle_netconfig_dhcp_values())
 }
