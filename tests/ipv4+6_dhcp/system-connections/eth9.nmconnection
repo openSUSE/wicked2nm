@@ -14,6 +14,7 @@ dhcp-iaid=mac
 dhcp-send-hostname-deprecated=false
 dhcp-send-hostname=0
 dhcp-send-release=0
+dns-priority=20
 method=auto
 
 [ipv6]
@@ -23,6 +24,7 @@ dhcp-iaid=mac
 dhcp-send-hostname-deprecated=false
 dhcp-send-hostname=0
 dhcp-send-release=0
+dns-priority=20
 ip6-privacy=1
 method=auto
 

@@ -235,22 +235,8 @@ pub async fn migrate(
             Some(lo) => lo.clone(),
             None => create_lo_connection(),
         };
-        loopback.ip_config.nameservers = match netconfig.static_dns_servers() {
-            Ok(nameservers) => nameservers,
-            Err(e) => {
-                let msg = format!("Error when parsing static DNS servers: {e}");
-                if !settings.continue_migration {
-                    return Err(anyhow::anyhow!(
-                        "{}, use the `--continue-migration` flag to ignore",
-                        msg
-                    )
-                    .into());
-                } else {
-                    log::warn!("{msg}");
-                    vec![]
-                }
-            }
-        };
+        loopback.ip_config.nameservers = netconfig.static_dns_servers.clone();
+
         if let Some(static_dns_searchlist) = &netconfig.static_dns_searchlist {
             loopback.ip_config.dns_searchlist = static_dns_searchlist.clone();
         }

@@ -18,6 +18,7 @@ use migrate::migrate;
 use reader::read as wicked_read;
 use serde::Serialize;
 use simplelog::ConfigBuilder;
+use std::path::PathBuf;
 use std::process::{ExitCode, Termination};
 use tokio::sync::OnceCell;
 
@@ -42,11 +43,24 @@ struct GlobalOpts {
     #[arg(long, global = true, env = "W2NM_WITHOUT_NETCONFIG")]
     pub without_netconfig: bool,
 
-    #[arg(long, global = true, default_value_t = String::from("/etc/sysconfig/network/config"), env = "W2NM_NETCONFIG_PATH")]
-    pub netconfig_path: String,
+    /// Base directory for ifcfg, ifsysctl and netconfig configuration files.
+    #[arg(
+        long,
+        global = true,
+        default_value = "/etc/sysconfig/network/",
+        env = "W2NM_NETCONFIG_BASE_DIR"
+    )]
+    pub netconfig_base_dir: PathBuf,
 
-    #[arg(long, global = true, default_value_t = String::from("/etc/sysconfig/network/dhcp"), env = "W2NM_NETCONFIG_DHCP_PATH")]
-    pub netconfig_dhcp_path: String,
+    /// Specify the path to the netconfig config file.
+    /// If not set, defaults to $W2NM_NETCONFIG_BASE_DIR/config
+    #[arg(long, global = true, env = "W2NM_NETCONFIG_PATH")]
+    pub netconfig_path: Option<PathBuf>,
+
+    /// Specify the path to the netconfig dhcp config file.
+    /// If not set, defaults to $W2NM_NETCONFIG_BASE_DIR/dhcp
+    #[arg(long, global = true, env = "W2NM_NETCONFIG_DHCP_PATH")]
+    pub netconfig_dhcp_path: Option<PathBuf>,
 }
 
 #[derive(Subcommand)]
@@ -92,17 +106,26 @@ pub enum Format {
 }
 
 async fn run_command(cli: Cli) -> anyhow::Result<()> {
+    let mut migration_settings = MigrationSettings {
+        continue_migration: true,
+        dry_run: false,
+        activate_connections: true,
+        with_netconfig: !cli.global_opts.without_netconfig,
+        netconfig_path: cli
+            .global_opts
+            .netconfig_path
+            .unwrap_or_else(|| cli.global_opts.netconfig_base_dir.join("config")),
+        netconfig_dhcp_path: cli
+            .global_opts
+            .netconfig_dhcp_path
+            .unwrap_or_else(|| cli.global_opts.netconfig_base_dir.join("dhcp")),
+        netconfig_base_dir: cli.global_opts.netconfig_base_dir,
+    };
+
     match cli.command {
         Commands::Show { paths, format } => {
             MIGRATION_SETTINGS
-                .set(MigrationSettings {
-                    continue_migration: true,
-                    dry_run: false,
-                    activate_connections: true,
-                    with_netconfig: !cli.global_opts.without_netconfig,
-                    netconfig_path: cli.global_opts.netconfig_path,
-                    netconfig_dhcp_path: cli.global_opts.netconfig_dhcp_path,
-                })
+                .set(migration_settings)
                 .expect("MIGRATION_SETTINGS was set too early");
 
             let interfaces_result = wicked_read(paths)?;
@@ -133,15 +156,11 @@ async fn run_command(cli: Cli) -> anyhow::Result<()> {
             dry_run,
             activate_connections,
         } => {
+            migration_settings.continue_migration = continue_migration;
+            migration_settings.dry_run = dry_run;
+            migration_settings.activate_connections = activate_connections;
             MIGRATION_SETTINGS
-                .set(MigrationSettings {
-                    continue_migration,
-                    dry_run,
-                    activate_connections,
-                    with_netconfig: !cli.global_opts.without_netconfig,
-                    netconfig_path: cli.global_opts.netconfig_path,
-                    netconfig_dhcp_path: cli.global_opts.netconfig_dhcp_path,
-                })
+                .set(migration_settings)
                 .expect("MIGRATION_SETTINGS was set too early");
 
             log::debug!(
@@ -189,8 +208,9 @@ struct MigrationSettings {
     dry_run: bool,
     activate_connections: bool,
     with_netconfig: bool,
-    netconfig_path: String,
-    netconfig_dhcp_path: String,
+    netconfig_base_dir: PathBuf,
+    netconfig_path: PathBuf,
+    netconfig_dhcp_path: PathBuf,
 }
 
 impl Default for MigrationSettings {
@@ -200,8 +220,9 @@ impl Default for MigrationSettings {
             dry_run: false,
             activate_connections: true,
             with_netconfig: false,
-            netconfig_path: "".to_string(),
-            netconfig_dhcp_path: "".to_string(),
+            netconfig_base_dir: PathBuf::default(),
+            netconfig_path: PathBuf::default(),
+            netconfig_dhcp_path: PathBuf::default(),
         }
     }
 }

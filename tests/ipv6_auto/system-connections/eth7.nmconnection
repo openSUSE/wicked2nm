@@ -1,6 +1,6 @@
 [connection]
 id=eth7
-uuid=85378eec-2abb-4cbb-a3d3-69c10921b2e0
+uuid=6efc94cf-c0a9-4272-a5d6-d054779a48a7
 type=ethernet
 interface-name=eth7
 
@@ -9,10 +9,12 @@ interface-name=eth7
 [match]
 
 [ipv4]
+dns-priority=20
 method=disabled
 
 [ipv6]
 addr-gen-mode=default
+dns-priority=20
 ip6-privacy=1
 method=auto
 

@@ -1,26 +1,14 @@
 use agama_network::{model::Connection, NetworkState};
 use globset::Glob;
 use serde::{Deserialize, Serialize};
-use std::{net::IpAddr, path::Path, str::FromStr};
+use std::{net::IpAddr, path::Path};
 
 #[derive(Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Netconfig {
-    pub static_dns_servers: Option<Vec<String>>,
+    pub static_dns_servers: Vec<IpAddr>,
     pub static_dns_searchlist: Option<Vec<String>>,
     pub dns_policy: Vec<String>,
-}
-
-impl Netconfig {
-    pub fn static_dns_servers(&self) -> Result<Vec<IpAddr>, std::net::AddrParseError> {
-        if let Some(static_dns_servers) = &self.static_dns_servers {
-            static_dns_servers
-                .iter()
-                .map(|x| IpAddr::from_str(x))
-                .collect()
-        } else {
-            Ok(vec![])
-        }
-    }
+    pub warnings: Vec<String>,
 }
 
 pub fn read_netconfig(path: impl AsRef<Path>) -> Result<Option<Netconfig>, anyhow::Error> {
@@ -32,37 +20,56 @@ pub fn read_netconfig(path: impl AsRef<Path>) -> Result<Option<Netconfig>, anyho
 
 fn handle_netconfig_values() -> Result<Option<Netconfig>, anyhow::Error> {
     let mut netconfig = Netconfig::default();
+
     if let Ok(dns_policy) = dotenv::var("NETCONFIG_DNS_POLICY") {
         if dns_policy == "auto" {
             netconfig.dns_policy = vec!["STATIC".to_string(), "*".to_string()];
         } else if !dns_policy.is_empty() {
             if dns_policy.contains(&"STATIC_FALLBACK".to_string()) {
-                anyhow::bail!("NETCONFIG_DNS_POLICY \"STATIC_FALLBACK\" is not supported");
+                netconfig
+                    .warnings
+                    .push("NETCONFIG_DNS_POLICY \"STATIC_FALLBACK\" is not supported".to_string());
+            } else {
+                netconfig.dns_policy = dns_policy
+                    .split_ascii_whitespace()
+                    .map(|s| s.to_string())
+                    .collect();
             }
-
-            netconfig.dns_policy = dns_policy.split(' ').map(|s| s.to_string()).collect();
         }
     }
     if let Ok(static_dns_servers) = dotenv::var("NETCONFIG_DNS_STATIC_SERVERS") {
         if !static_dns_servers.is_empty() {
-            netconfig.static_dns_servers = Some(
-                static_dns_servers
-                    .split(' ')
-                    .map(|s| s.to_string())
-                    .collect::<Vec<String>>(),
-            );
+            netconfig.static_dns_servers = static_dns_servers
+                .split_ascii_whitespace()
+                .filter_map(|ip_str| match ip_str.parse::<IpAddr>() {
+                    Ok(x) => Some(x),
+                    Err(_e) => {
+                        netconfig.warnings.push(format!(
+                            "Invalid value '{ip_str}' in NETCONFIG_DNS_STATIC_SERVERS"
+                        ));
+                        None
+                    }
+                })
+                .collect();
         }
     }
     if let Ok(static_dns_searchlist) = dotenv::var("NETCONFIG_DNS_STATIC_SEARCHLIST") {
         if !static_dns_searchlist.is_empty() {
             netconfig.static_dns_searchlist = Some(
                 static_dns_searchlist
-                    .split(' ')
+                    .split_ascii_whitespace()
                     .map(|s| s.to_string())
                     .collect::<Vec<String>>(),
             );
         }
     }
+
+    if let Ok(gratuitous_arp) = dotenv::var("SEND_GRATUITOUS_ARP") {
+        if !gratuitous_arp.eq("auto") {
+            netconfig.warnings.push("SEND_GRATUITOUS_ARP differs from 'auto', consider net.ipv4.conf.{{all,default}}.arp_notify variable in /etc/sysctl.conf".to_string());
+        }
+    }
+
     Ok(Some(netconfig))
 }
 
@@ -118,10 +125,10 @@ mod tests {
     #[test]
     fn test_handle_netconfig_values() {
         env::set_var("NETCONFIG_DNS_POLICY", "STATIC_FALLBACK NetworkManager");
-        assert!(handle_netconfig_values().is_err());
+        assert!(handle_netconfig_values().unwrap().unwrap().warnings.len() == 1);
 
         env::set_var("NETCONFIG_DNS_POLICY", "STATIC_FALLBACK");
-        assert!(handle_netconfig_values().is_err());
+        assert!(handle_netconfig_values().unwrap().unwrap().warnings.len() == 1);
 
         env::set_var("NETCONFIG_DNS_POLICY", "");
         env::set_var(
@@ -139,13 +146,14 @@ mod tests {
         assert_eq!(
             handle_netconfig_values().unwrap(),
             Some(Netconfig {
-                static_dns_servers: Some(vec![
-                    "192.168.0.10".to_string(),
-                    "192.168.1.10".to_string(),
-                    "2001:db8::10".to_string()
-                ]),
+                static_dns_servers: vec![
+                    "192.168.0.10".parse().unwrap(),
+                    "192.168.1.10".parse().unwrap(),
+                    "2001:db8::10".parse().unwrap()
+                ],
                 static_dns_searchlist: Some(vec!["suse.com".to_string(), "suse.de".to_string()]),
-                dns_policy: vec!["STATIC".to_string()]
+                dns_policy: vec!["STATIC".to_string()],
+                ..Default::default()
             })
         );
 
@@ -155,7 +163,7 @@ mod tests {
         assert_eq!(
             handle_netconfig_values().unwrap(),
             Some(Netconfig {
-                static_dns_servers: None,
+                static_dns_servers: vec![],
                 static_dns_searchlist: None,
                 ..Default::default()
             })

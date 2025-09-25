@@ -1,0 +1,35 @@
+<interface origin="compat:suse:/etc/sysconfig/network/ifcfg-en0">
+  <name>en0</name>
+  <control>
+    <mode>boot</mode>
+  </control>
+  <firewall/>
+  <link/>
+  <ipv4>
+    <enabled>true</enabled>
+    <forwarding>true</forwarding>
+    <arp-verify>true</arp-verify>
+    <arp-notify>false</arp-notify>
+  </ipv4>
+  <ipv4:static>
+    <address>
+      <local>192.168.2.2/24</local>
+    </address>
+  </ipv4:static>
+  <ipv6>
+    <enabled>true</enabled>
+    <forwarding>true</forwarding>
+    <autoconf>true</autoconf>
+    <privacy>prefer-public</privacy>
+    <accept-ra>router</accept-ra>
+    <accept-dad>fail-address</accept-dad>
+    <addr-gen-mode>random</addr-gen-mode>
+    <stable-secret>fe:dead::beaf</stable-secret>
+  </ipv6>
+  <ipv6:static>
+    <address>
+      <local>fc00:dead:beaf::1/64</local>
+    </address>
+  </ipv6:static>
+</interface>
+

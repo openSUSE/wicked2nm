@@ -601,14 +601,7 @@ mod tests {
 
     #[allow(dead_code)]
     fn setup_default_migration_settings() {
-        let _ = MIGRATION_SETTINGS.set(crate::MigrationSettings {
-            continue_migration: false,
-            dry_run: false,
-            activate_connections: true,
-            with_netconfig: false,
-            netconfig_path: "".to_string(),
-            netconfig_dhcp_path: "".to_string(),
-        });
+        let _ = MIGRATION_SETTINGS.set(crate::MigrationSettings::default());
     }
 
     #[test]
