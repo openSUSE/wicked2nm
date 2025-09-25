@@ -14,7 +14,7 @@ mod wireless;
 use clap::builder::TypedValueParser;
 use clap::{Args, Parser, Subcommand};
 use log::*;
-use migrate::migrate;
+use migrate::{apply_networkstate, to_networkstate};
 use reader::read as wicked_read;
 use serde::Serialize;
 use simplelog::ConfigBuilder;
@@ -108,7 +108,6 @@ pub enum Format {
 async fn run_command(cli: Cli) -> anyhow::Result<()> {
     let mut migration_settings = MigrationSettings {
         continue_migration: true,
-        dry_run: false,
         activate_connections: true,
         with_netconfig: !cli.global_opts.without_netconfig,
         netconfig_path: cli
@@ -157,7 +156,6 @@ async fn run_command(cli: Cli) -> anyhow::Result<()> {
             activate_connections,
         } => {
             migration_settings.continue_migration = continue_migration;
-            migration_settings.dry_run = dry_run;
             migration_settings.activate_connections = activate_connections;
             MIGRATION_SETTINGS
                 .set(migration_settings)
@@ -169,15 +167,22 @@ async fn run_command(cli: Cli) -> anyhow::Result<()> {
             );
 
             let interfaces_result = wicked_read(paths)?;
+            let mut network_state_result = to_networkstate(&interfaces_result)?;
 
-            if !continue_migration && interfaces_result.warning.is_some() {
-                return Err(interfaces_result.warning.unwrap());
+            if !continue_migration && network_state_result.has_warnings {
+                anyhow::bail!("Migration failed because of warnings, use the `--continue-migration` flag to ignore");
             }
 
-            match migrate(
-                interfaces_result.interfaces,
+            if dry_run {
+                for connection in network_state_result.network_state.connections {
+                    log::debug!("{connection:#?}");
+                }
+                return Ok(());
+            }
+
+            match apply_networkstate(
+                &mut network_state_result.network_state,
                 interfaces_result.netconfig,
-                interfaces_result.netconfig_dhcp,
             )
             .await
             {
@@ -205,7 +210,6 @@ impl Termination for CliResult {
 #[derive(Debug)]
 struct MigrationSettings {
     continue_migration: bool,
-    dry_run: bool,
     activate_connections: bool,
     with_netconfig: bool,
     netconfig_base_dir: PathBuf,
@@ -217,7 +221,6 @@ impl Default for MigrationSettings {
     fn default() -> Self {
         MigrationSettings {
             continue_migration: false,
-            dry_run: false,
             activate_connections: true,
             with_netconfig: false,
             netconfig_base_dir: PathBuf::default(),

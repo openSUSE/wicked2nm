@@ -28,6 +28,9 @@ dotenv = "0.15.0"
 serde_path_to_error = "0.1.16"
 globset = { version = "0.4.16", default-features = false }
 
+[dev-dependencies]
+testing_logger = "0.1.1"
+
 [[bin]]
 name = "wicked2nm"
 path = "src/main.rs"

@@ -12,7 +12,6 @@ use agama_network::model::{
     self, Dhcp4Settings, Dhcp6Settings, IpConfig, IpRoute, Ipv4Method, Ipv6Method, MacAddress,
 };
 use agama_network::types::Status;
-use anyhow::anyhow;
 use cidr::IpInet;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, skip_serializing_none, DeserializeFromStr, SerializeDisplay};
@@ -346,14 +345,16 @@ impl From<ControlMode> for bool {
     }
 }
 
+#[derive(Default)]
 pub struct ConnectionResult {
     pub connections: Vec<model::Connection>,
-    pub warnings: Vec<anyhow::Error>,
+    pub has_warnings: bool,
 }
 
+#[derive(Default)]
 pub struct IpConfigResult {
     ip_config: IpConfig,
-    warnings: Vec<anyhow::Error>,
+    has_warnings: bool,
 }
 
 impl From<&LinkPort> for model::PortConfig {
@@ -383,10 +384,13 @@ impl Interface {
         netconfig_dhcp: &Option<NetconfigDhcp>,
     ) -> Result<ConnectionResult, anyhow::Error> {
         let settings = MIGRATION_SETTINGS.get().unwrap();
+        let mut connection_result = ConnectionResult::default();
+
         let ip_config = self.to_ip_config(netconfig_dhcp)?;
-        let mut warnings = ip_config.warnings;
-        let mut connections: Vec<model::Connection> = vec![];
-        warnings.append(&mut check_ignored(self));
+        connection_result.has_warnings |= ip_config.has_warnings;
+
+        connection_result.has_warnings |= has_unhandled_field(self);
+
         let mut connection = model::Connection {
             id: self.name.clone(),
             firewall_zone: self.firewall.zone.clone(),
@@ -409,7 +413,7 @@ impl Interface {
                     ..Default::default()
                 };
                 connection.controller = Some(con_ovs_port.uuid);
-                connections.push(con_ovs_port);
+                connection_result.connections.push(con_ovs_port);
             }
         }
 
@@ -424,23 +428,23 @@ impl Interface {
         if let Some(ethernet) = &self.ethernet {
             connection.custom_mac_address = MacAddress::try_from(&ethernet.address)?;
             connection.config = model::ConnectionConfig::Ethernet;
-            connections.push(connection);
+            connection_result.connections.push(connection);
         } else if let Some(dummy) = &self.dummy {
             connection.custom_mac_address = MacAddress::try_from(&dummy.address)?;
             connection.config = model::ConnectionConfig::Dummy;
-            connections.push(connection);
+            connection_result.connections.push(connection);
         } else if let Some(bond) = &self.bond {
             connection.custom_mac_address = MacAddress::try_from(&bond.address)?;
             connection.config = bond.into();
-            connections.push(connection);
+            connection_result.connections.push(connection);
         } else if let Some(vlan) = &self.vlan {
             connection.custom_mac_address = MacAddress::try_from(&vlan.address)?;
             connection.config = vlan.into();
-            connections.push(connection);
+            connection_result.connections.push(connection);
         } else if let Some(bridge) = &self.bridge {
             connection.custom_mac_address = MacAddress::try_from(&bridge.address)?;
             connection.config = bridge.into();
-            connections.push(connection);
+            connection_result.connections.push(connection);
         } else if let Some(wireless) = &self.wireless {
             if let Some(networks) = &wireless.networks {
                 if networks.len() > 1 {
@@ -455,31 +459,29 @@ impl Interface {
                     if let Some(wpa_eap) = &network.wpa_eap {
                         wireless_connection.ieee_8021x_config = Some(wpa_eap.try_into()?);
                     }
-                    connections.push(wireless_connection);
+                    connection_result.connections.push(wireless_connection);
                 }
             }
         } else if let Some(infiniband) = &self.infiniband {
             if infiniband.multicast.is_some() {
-                warnings.push(anyhow::anyhow!(
-                    "Infiniband multicast isn't supported by NetworkManager"
-                ));
+                log::warn!("Infiniband multicast isn't supported by NetworkManager");
+                connection_result.has_warnings = true;
             }
             connection.config = infiniband.into();
-            connections.push(connection)
+            connection_result.connections.push(connection);
         } else if let Some(infiniband_child) = &self.infiniband_child {
             if infiniband_child.multicast.is_some() {
-                warnings.push(anyhow::anyhow!(
-                    "Infiniband multicast isn't supported by NetworkManager"
-                ));
+                log::warn!("Infiniband multicast isn't supported by NetworkManager");
+                connection_result.has_warnings = true;
             }
             connection.config = infiniband_child.into();
-            connections.push(connection)
+            connection_result.connections.push(connection);
         } else if let Some(tun) = &self.tun {
             connection.config = tun.into();
-            connections.push(connection)
+            connection_result.connections.push(connection);
         } else if let Some(tap) = &self.tap {
             connection.config = tap.into();
-            connections.push(connection)
+            connection_result.connections.push(connection);
         } else if let Some(ovs_bridge) = &self.ovs_bridge {
             let mut vlan_tag: Option<u16> = None;
             let mut controller_uuid = None;
@@ -495,7 +497,7 @@ impl Interface {
                     ..Default::default()
                 };
                 controller_uuid = Some(con_ovs_bridge.uuid);
-                connections.push(con_ovs_bridge);
+                connection_result.connections.push(con_ovs_bridge);
             }
 
             let con_ovs_port = model::Connection {
@@ -512,28 +514,20 @@ impl Interface {
             });
             connection.controller = Some(con_ovs_port.uuid);
 
-            connections.push(con_ovs_port);
-            connections.push(connection);
+            connection_result.connections.push(con_ovs_port);
+            connection_result.connections.push(connection);
         } else {
-            connections.push(connection);
+            connection_result.connections.push(connection);
         }
 
-        Ok(ConnectionResult {
-            connections,
-            warnings,
-        })
+        Ok(connection_result)
     }
 
     pub fn to_ip_config(
         &self,
         netconfig_dhcp: &Option<NetconfigDhcp>,
     ) -> Result<IpConfigResult, anyhow::Error> {
-        let mut connection_result = IpConfigResult {
-            ip_config: IpConfig {
-                ..Default::default()
-            },
-            warnings: vec![],
-        };
+        let mut ipconfig_result = IpConfigResult::default();
         let method4 = if self.ipv4_static.is_some() {
             Ipv4Method::Manual
         } else if !self.ipv4.enabled {
@@ -577,9 +571,11 @@ impl Interface {
                             }
                         };
                         if broadcast_addr != local_addr.last_address() {
-                            connection_result.warnings.push(anyhow!(
-                                "Broadcast \"{}\" for {}: Custom broadcast addresses are not supported by NetworkManager", broadcast, self.name
-                            ));
+                            log::warn!(
+                                "Broadcast \"{}\" for {}: Custom broadcast addresses are not supported by NetworkManager",
+                                broadcast, self.name
+                            );
+                            ipconfig_result.has_warnings = true;
                         }
                     }
 
@@ -591,7 +587,8 @@ impl Interface {
                     routes4.push(match route.try_into() {
                         Ok(route) => route,
                         Err(e) => {
-                            connection_result.warnings.push(e);
+                            log::warn!("{e}");
+                            ipconfig_result.has_warnings = true;
                             continue;
                         }
                     });
@@ -614,7 +611,8 @@ impl Interface {
                     routes6.push(match route.try_into() {
                         Ok(route) => route,
                         Err(e) => {
-                            connection_result.warnings.push(e);
+                            log::warn!("{e}");
+                            ipconfig_result.has_warnings = true;
                             continue;
                         }
                     });
@@ -669,7 +667,7 @@ impl Interface {
             ip6_privacy = Some(privacy.clone() as i32);
         }
 
-        connection_result.ip_config = IpConfig {
+        ipconfig_result.ip_config = IpConfig {
             addresses,
             method4,
             method6,
@@ -680,7 +678,7 @@ impl Interface {
             ip6_privacy,
             ..Default::default()
         };
-        Ok(connection_result)
+        Ok(ipconfig_result)
     }
 }
 
@@ -708,7 +706,7 @@ impl TryFrom<&Route> for IpRoute {
             };
             IpInet::new(default_ip, 0)?
         } else {
-            return Err(anyhow::anyhow!("Error occurred when parsing a route"));
+            return Err(anyhow::anyhow!("Error occurred when parsing route"));
         };
         let metric = route.priority;
         Ok(IpRoute {
@@ -719,37 +717,40 @@ impl TryFrom<&Route> for IpRoute {
     }
 }
 
-fn check_ignored(interface: &Interface) -> Vec<anyhow::Error> {
-    let mut warnings: Vec<anyhow::Error> = vec![];
+fn has_unhandled_field(interface: &Interface) -> bool {
+    let mut warnings = false;
 
     let ipv4 = &interface.ipv4;
     let ipv4_default = Ipv4::default();
     if ipv4.arp_verify != ipv4_default.arp_verify {
-        warnings.push(anyhow!(
+        log::warn!(
             "Unhandled field in interface {}: {}",
             interface.name,
             stringify!(ipv4.arp_verify)
-        ));
+        );
+        warnings = true;
     }
 
     let ipv6 = &interface.ipv6;
     let ipv6_default = Ipv6::default();
     if ipv6.accept_redirects != ipv6_default.accept_redirects {
-        warnings.push(anyhow!(
+        log::warn!(
             "Unhandled field in interface {}: {}",
             interface.name,
             stringify!(ipv6.accept_redirects)
-        ));
+        );
+        warnings = true;
     }
 
     if let Some(ipv4_dhcp) = &interface.ipv4_dhcp {
         let ipv4_dhcp_default = Ipv4Dhcp::default();
         if ipv4_dhcp.flags != ipv4_dhcp_default.flags {
-            warnings.push(anyhow!(
+            log::warn!(
                 "Unhandled field in interface {}: {}",
                 interface.name,
                 stringify!(ipv4_dhcp.flags)
-            ));
+            );
+            warnings = true;
         }
         if ipv4_dhcp.update != ipv4_dhcp_default.update {
             log::info!(
@@ -759,29 +760,32 @@ fn check_ignored(interface: &Interface) -> Vec<anyhow::Error> {
             );
         }
         if ipv4_dhcp.defer_timeout != ipv4_dhcp_default.defer_timeout {
-            warnings.push(anyhow!(
+            log::warn!(
                 "Unhandled field in interface {}: {}",
                 interface.name,
                 stringify!(ipv4_dhcp.defer_timeout)
-            ));
+            );
+            warnings = true;
         }
         if ipv4_dhcp.recover_lease != ipv4_dhcp_default.recover_lease {
-            warnings.push(anyhow!(
+            log::warn!(
                 "Unhandled field in interface {}: {}",
                 interface.name,
                 stringify!(ipv4_dhcp.recover_lease)
-            ));
+            );
+            warnings = true;
         }
     }
 
     if let Some(ipv6_dhcp) = &interface.ipv6_dhcp {
         let ipv6_dhcp_default = Ipv6Dhcp::default();
         if ipv6_dhcp.flags != ipv6_dhcp_default.flags {
-            warnings.push(anyhow!(
+            log::warn!(
                 "Unhandled field in interface {}: {}",
                 interface.name,
                 stringify!(ipv6_dhcp.flags)
-            ));
+            );
+            warnings = true;
         }
 
         if ipv6_dhcp.update != ipv6_dhcp_default.update {
@@ -792,42 +796,47 @@ fn check_ignored(interface: &Interface) -> Vec<anyhow::Error> {
             );
         }
         if ipv6_dhcp.rapid_commit != ipv6_dhcp_default.rapid_commit {
-            warnings.push(anyhow!(
+            log::warn!(
                 "Unhandled field in interface {}: {}",
                 interface.name,
                 stringify!(ipv6_dhcp.rapid_commit)
-            ));
+            );
+            warnings = true;
         }
         if ipv6_dhcp.defer_timeout != ipv6_dhcp_default.defer_timeout {
-            warnings.push(anyhow!(
+            log::warn!(
                 "Unhandled field in interface {}: {}",
                 interface.name,
                 stringify!(ipv6_dhcp.defer_timeout)
-            ));
+            );
+            warnings = true;
         }
         if ipv6_dhcp.recover_lease != ipv6_dhcp_default.recover_lease {
-            warnings.push(anyhow!(
+            log::warn!(
                 "Unhandled field in interface {}: {}",
                 interface.name,
                 stringify!(ipv6_dhcp.recover_lease)
-            ));
+            );
+            warnings = true;
         }
         if ipv6_dhcp.refresh_lease != ipv6_dhcp_default.refresh_lease {
-            warnings.push(anyhow!(
+            log::warn!(
                 "Unhandled field in interface {}: {}",
                 interface.name,
                 stringify!(ipv6_dhcp.refresh_lease)
-            ));
+            );
+            warnings = true;
         }
     }
     if let Some(ipv6_auto) = &interface.ipv6_auto {
         let ipv6_auto_default = Ipv6Auto::default();
         if ipv6_auto.update != ipv6_auto_default.update {
-            warnings.push(anyhow!(
+            log::warn!(
                 "Unhandled field in interface {}: {}",
                 interface.name,
                 stringify!(ipv6_auto.update)
-            ));
+            );
+            warnings = true;
         }
     }
 
@@ -837,6 +846,7 @@ fn check_ignored(interface: &Interface) -> Vec<anyhow::Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use log::Level;
 
     #[allow(dead_code)]
     fn setup_default_migration_settings() {
@@ -1001,8 +1011,9 @@ mod tests {
     #[test]
     fn test_ignored_default() {
         let ifc = Interface::default();
-        assert!(check_ignored(&ifc).is_empty());
+        assert!(!has_unhandled_field(&ifc));
 
+        testing_logger::setup();
         let ifc = Interface {
             ipv4_dhcp: Some(Ipv4Dhcp {
                 flags: String::from("123"),
@@ -1026,7 +1037,26 @@ mod tests {
             }),
             ..Default::default()
         };
-        assert!(check_ignored(&ifc).len() == 9);
+        assert!(has_unhandled_field(&ifc));
+        testing_logger::validate(|captured_logs| {
+            for l in captured_logs {
+                println!("{:?}", l.body);
+            }
+            assert_eq!(
+                captured_logs
+                    .iter()
+                    .filter(|l| l.level == Level::Warn)
+                    .count(),
+                9
+            );
+            assert_eq!(
+                captured_logs
+                    .iter()
+                    .filter(|l| l.level == Level::Info)
+                    .count(),
+                2
+            );
+        });
     }
 
     #[test]
@@ -1043,8 +1073,7 @@ mod tests {
         };
 
         let ip_result = ifc.to_ip_config(&None).unwrap();
-        println!("{:?}", ip_result.warnings);
-        assert!(ip_result.warnings.is_empty());
+        assert!(!ip_result.has_warnings);
 
         let ifc = Interface {
             ipv4_static: Some(Ipv4Static {
@@ -1058,6 +1087,6 @@ mod tests {
         };
 
         let ip_result = ifc.to_ip_config(&None).unwrap();
-        assert!(ip_result.warnings.len() == 1);
+        assert!(ip_result.has_warnings);
     }
 }
