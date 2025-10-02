@@ -1710,6 +1710,7 @@ dependencies = [
  "globset",
  "log",
  "macaddr",
+ "nix",
  "quick-xml",
  "regex",
  "serde",

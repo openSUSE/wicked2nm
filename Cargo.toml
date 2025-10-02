@@ -27,6 +27,7 @@ macaddr = "1.0"
 dotenv = "0.15.0"
 serde_path_to_error = "0.1.16"
 globset = { version = "0.4.16", default-features = false }
+nix = { version = "0.30.1", features = ["net"] }
 
 [dev-dependencies]
 testing_logger = "0.1.1"
