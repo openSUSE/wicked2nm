@@ -1,9 +1,12 @@
 use crate::interface::{ConnectionResult, Link, LinkPort, LinkPortType};
 use crate::netconfig::{apply_dns_policy, Netconfig};
 use crate::reader::InterfacesResult;
+use crate::MIGRATION_SETTINGS;
 use agama_network::model::{Connection, ConnectionConfig, IpConfig, MatchConfig, StateConfig};
 use agama_network::{model, Adapter, NetworkManagerAdapter, NetworkState};
 use cidr::IpInet;
+use nix::ifaddrs::getifaddrs;
+use std::collections::HashSet;
 use std::fmt;
 use std::str::FromStr;
 use std::{collections::HashMap, error::Error};
@@ -136,6 +139,7 @@ pub struct NetworkStateResult {
 pub fn to_networkstate(
     interface_result: &InterfacesResult,
 ) -> Result<NetworkStateResult, anyhow::Error> {
+    let settings = MIGRATION_SETTINGS.get().unwrap();
     let mut parents: HashMap<Uuid, Link> = HashMap::new();
     let mut connection_result: ConnectionResult = ConnectionResult {
         has_warnings: interface_result.has_warnings,
@@ -207,6 +211,36 @@ pub fn to_networkstate(
         }
     }
 
+    if settings.activate_connections {
+        let system_interfaces = list_system_interfaces()?;
+        for con in &mut connection_result.connections {
+            let interface_name = match &con.config {
+                ConnectionConfig::Dummy => continue,
+                ConnectionConfig::Bond(_) => continue,
+                ConnectionConfig::Loopback => continue,
+                ConnectionConfig::Vlan(_) => continue,
+                ConnectionConfig::Bridge(_) => continue,
+                ConnectionConfig::Tun(_) => continue,
+                ConnectionConfig::OvsBridge(_) => continue,
+                ConnectionConfig::OvsPort(_) => continue,
+                ConnectionConfig::OvsInterface(_) => continue,
+                ConnectionConfig::Ethernet => con.interface.as_ref().unwrap_or(&con.id),
+                ConnectionConfig::Wireless(_) => con.interface.as_ref().unwrap_or(&con.id),
+                ConnectionConfig::Infiniband(config) => {
+                    if let Some(parent) = &config.parent {
+                        parent
+                    } else {
+                        continue;
+                    }
+                }
+            };
+
+            if con.autoconnect && !system_interfaces.contains(interface_name) {
+                con.status = agama_network::types::Status::Down;
+            }
+        }
+    }
+
     let mut state_result = NetworkStateResult {
         has_warnings: connection_result.has_warnings,
         ..Default::default()
@@ -257,4 +291,14 @@ pub async fn apply_networkstate(
 
     nm.write(state).await?;
     Ok(())
+}
+
+fn list_system_interfaces() -> Result<HashSet<String>, anyhow::Error> {
+    let mut interface_names = HashSet::new();
+
+    for ifaddr in getifaddrs()? {
+        interface_names.insert(ifaddr.interface_name);
+    }
+
+    Ok(interface_names)
 }
