@@ -6,10 +6,10 @@ use agama_network::model::{Connection, ConnectionConfig, IpConfig, MatchConfig, 
 use agama_network::{model, Adapter, NetworkManagerAdapter, NetworkState};
 use cidr::IpInet;
 use nix::ifaddrs::getifaddrs;
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt;
 use std::str::FromStr;
-use std::{collections::HashMap, error::Error};
 use uuid::Uuid;
 
 #[derive(Debug)]
@@ -258,7 +258,7 @@ pub fn to_networkstate(
 pub async fn apply_networkstate(
     state: &mut NetworkState,
     netconfig: Option<Netconfig>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), anyhow::Error> {
     let nm = NetworkManagerAdapter::from_system().await?;
 
     if let Some(netconfig) = netconfig {

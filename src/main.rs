@@ -20,6 +20,7 @@ use serde::Serialize;
 use simplelog::ConfigBuilder;
 use std::path::PathBuf;
 use std::process::{ExitCode, Termination};
+use thiserror::Error;
 use tokio::sync::OnceCell;
 
 use crate::interface::Interface;
@@ -105,7 +106,17 @@ pub enum Format {
     Text,
 }
 
-async fn run_command(cli: Cli) -> anyhow::Result<()> {
+#[derive(Error, Debug)]
+pub enum MigrationError {
+    #[error("Migration failed because of warnings")]
+    Warnings,
+    #[error("Show failed: {0}")]
+    ShowError(anyhow::Error),
+    #[error("Migration failed: {0}")]
+    MigrationError(anyhow::Error),
+}
+
+async fn run_command(cli: Cli) -> Result<(), MigrationError> {
     let mut migration_settings = MigrationSettings {
         continue_migration: true,
         activate_connections: true,
@@ -126,28 +137,7 @@ async fn run_command(cli: Cli) -> anyhow::Result<()> {
             MIGRATION_SETTINGS
                 .set(migration_settings)
                 .expect("MIGRATION_SETTINGS was set too early");
-
-            let interfaces_result = wicked_read(paths)?;
-
-            #[derive(Debug, Serialize)]
-            struct WickedConfig {
-                interface: Vec<Interface>,
-                netconfig: Option<Netconfig>,
-            }
-            let show_output = WickedConfig {
-                interface: interfaces_result.interfaces,
-                netconfig: interfaces_result.netconfig,
-            };
-
-            let output = match format {
-                Format::Json => serde_json::to_string(&show_output)?,
-                Format::PrettyJson => serde_json::to_string_pretty(&show_output)?,
-                Format::Yaml => serde_yaml::to_string(&show_output)?,
-                Format::Xml => quick_xml::se::to_string_with_root("wicked-config", &show_output)?,
-                Format::Text => format!("{show_output:?}"),
-            };
-            println!("{output}");
-            Ok(())
+            show_command(paths, format).map_err(MigrationError::ShowError)
         }
         Commands::Migrate {
             paths,
@@ -166,11 +156,12 @@ async fn run_command(cli: Cli) -> anyhow::Result<()> {
                 MIGRATION_SETTINGS.get().unwrap()
             );
 
-            let interfaces_result = wicked_read(paths)?;
-            let mut network_state_result = to_networkstate(&interfaces_result)?;
+            let interfaces_result = wicked_read(paths).map_err(MigrationError::MigrationError)?;
+            let mut network_state_result =
+                to_networkstate(&interfaces_result).map_err(MigrationError::MigrationError)?;
 
             if !continue_migration && network_state_result.has_warnings {
-                anyhow::bail!("Migration failed because of warnings, use the `--continue-migration` flag to ignore");
+                return Err(MigrationError::Warnings);
             }
 
             if dry_run {
@@ -187,10 +178,34 @@ async fn run_command(cli: Cli) -> anyhow::Result<()> {
             .await
             {
                 Ok(()) => Ok(()),
-                Err(e) => Err(anyhow::anyhow!("Migration failed: {}", e)),
+                Err(e) => Err(MigrationError::MigrationError(e)),
             }
         }
     }
+}
+
+fn show_command(paths: Vec<String>, format: Format) -> anyhow::Result<()> {
+    let interfaces_result = wicked_read(paths)?;
+
+    #[derive(Debug, Serialize)]
+    struct WickedConfig {
+        interface: Vec<Interface>,
+        netconfig: Option<Netconfig>,
+    }
+    let show_output = WickedConfig {
+        interface: interfaces_result.interfaces,
+        netconfig: interfaces_result.netconfig,
+    };
+
+    let output = match format {
+        Format::Json => serde_json::to_string(&show_output)?,
+        Format::PrettyJson => serde_json::to_string_pretty(&show_output)?,
+        Format::Yaml => serde_yaml::to_string(&show_output)?,
+        Format::Xml => quick_xml::se::to_string_with_root("wicked-config", &show_output)?,
+        Format::Text => format!("{show_output:?}"),
+    };
+    println!("{output}");
+    Ok(())
 }
 
 /// Represents the result of execution.
@@ -199,6 +214,8 @@ pub enum CliResult {
     Ok = 0,
     /// Something went wrong.
     Error = 1,
+    /// Failed due to warnings.
+    Warnings = 2,
 }
 
 impl Termination for CliResult {
@@ -251,7 +268,15 @@ async fn main() -> CliResult {
 
     if let Err(error) = run_command(cli).await {
         log::error!("{error}");
-        return CliResult::Error;
+        match error {
+            MigrationError::Warnings => {
+                log::info!("Use the `--continue-migration` flag to ignore warnings");
+                return CliResult::Warnings;
+            }
+            _ => {
+                return CliResult::Error;
+            }
+        }
     }
 
     CliResult::Ok
