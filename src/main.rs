@@ -26,7 +26,7 @@ use tokio::sync::OnceCell;
 use crate::interface::Interface;
 use crate::netconfig::Netconfig;
 
-#[derive(Parser)]
+#[derive(Parser, Clone)]
 #[command(name = "wicked2nm", version, about, long_about = None)]
 struct Cli {
     #[clap(flatten)]
@@ -36,7 +36,7 @@ struct Cli {
     pub command: Commands,
 }
 
-#[derive(Debug, Args)]
+#[derive(Debug, Args, Clone)]
 struct GlobalOpts {
     #[arg(long, global = true, default_value_t = LevelFilter::Info, value_parser = clap::builder::PossibleValuesParser::new(["TRACE", "DEBUG", "INFO", "WARN", "ERROR"]).map(|s| s.parse::<LevelFilter>().unwrap()),)]
     pub log_level: LevelFilter,
@@ -62,9 +62,13 @@ struct GlobalOpts {
     /// If not set, defaults to $W2NM_NETCONFIG_BASE_DIR/dhcp
     #[arg(long, global = true, env = "W2NM_NETCONFIG_DHCP_PATH")]
     pub netconfig_dhcp_path: Option<PathBuf>,
+
+    /// Disable user hints.
+    #[arg(long, global = true, env = "W2NM_DISABLE_HINTS")]
+    pub disable_hints: bool,
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Clone)]
 pub enum Commands {
     /// Shows the current xml wicked configuration
     Show {
@@ -215,7 +219,7 @@ pub enum CliResult {
     /// Something went wrong.
     Error = 1,
     /// Failed due to warnings.
-    Warnings = 2,
+    Warnings = 3,
 }
 
 impl Termination for CliResult {
@@ -266,11 +270,13 @@ async fn main() -> CliResult {
     )
     .unwrap();
 
-    if let Err(error) = run_command(cli).await {
+    if let Err(error) = run_command(cli.clone()).await {
         log::error!("{error}");
         match error {
             MigrationError::Warnings => {
-                log::info!("Use the `--continue-migration` flag to ignore warnings");
+                if !cli.global_opts.disable_hints {
+                    log::info!("Use the `--continue-migration` flag to ignore warnings");
+                }
                 return CliResult::Warnings;
             }
             _ => {
