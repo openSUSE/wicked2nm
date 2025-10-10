@@ -1,0 +1,3 @@
+W2NM_NETCONFIG_BASE_DIR=./netconfig
+NM_VERSION_ge=1.52
+

@@ -1,0 +1,17 @@
+<interface origin="compat:suse:/tests/autoip/netconfig/ifcfg-en5">
+  <name>en5</name>
+  <control>
+    <mode>boot</mode>
+  </control>
+  <link/>
+  <ipv4>
+    <enabled>true</enabled>
+  </ipv4>
+  <ipv4:auto>
+    <enabled>true</enabled>
+  </ipv4:auto>
+  <ipv6>
+    <enabled>true</enabled>
+    <privacy>prefer-public</privacy>
+  </ipv6>
+</interface>

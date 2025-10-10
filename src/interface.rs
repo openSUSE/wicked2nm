@@ -9,12 +9,14 @@ use crate::vlan::Vlan;
 use crate::wireless::Wireless;
 use crate::MIGRATION_SETTINGS;
 use agama_network::model::{
-    self, Dhcp4Settings, Dhcp6Settings, IpConfig, IpRoute, Ipv4Method, Ipv6Method, MacAddress,
+    self, Dhcp4Settings, Dhcp6Settings, IpConfig, IpRoute, Ipv4Method, Ipv6Method, LinkLocal,
+    MacAddress,
 };
 use agama_network::types::Status;
 use cidr::IpInet;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, skip_serializing_none, DeserializeFromStr, SerializeDisplay};
+use std::collections::HashSet;
 use std::{net::IpAddr, str::FromStr};
 use strum_macros::{Display, EnumString};
 
@@ -30,6 +32,8 @@ pub struct Interface {
     pub ipv4_static: Option<Ipv4Static>,
     #[serde(rename = "ipv4-dhcp")]
     pub ipv4_dhcp: Option<Ipv4Dhcp>,
+    #[serde(rename = "ipv4-auto")]
+    pub ipv4_auto: Option<Ipv4Auto>,
     pub ipv6: Ipv6,
     #[serde(rename = "ipv6-static")]
     pub ipv6_static: Option<Ipv6Static>,
@@ -170,6 +174,12 @@ pub struct Ipv4Dhcp {
     pub recover_lease: bool,
     #[serde(rename = "release-lease", default)]
     pub release_lease: bool,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct Ipv4Auto {
+    pub enabled: bool,
+    pub flags: Option<String>,
 }
 
 fn default_flags() -> String {
@@ -540,6 +550,8 @@ impl Interface {
             Ipv4Method::Disabled
         } else if self.ipv4_dhcp.is_some() {
             Ipv4Method::Auto
+        } else if self.ipv4_auto.is_some() {
+            Ipv4Method::LinkLocal
         } else {
             Ipv4Method::Disabled
         };
@@ -551,6 +563,26 @@ impl Interface {
             Ipv6Method::Disabled
         } else {
             Ipv6Method::Auto
+        };
+
+        let link_local4 = if let Some(auto4) = &self.ipv4_auto {
+            if auto4.enabled {
+                if let Some(flags) = &auto4.flags {
+                    if flags.contains("fallback") {
+                        LinkLocal::Fallback
+                    } else if flags.contains("primary") {
+                        LinkLocal::Enabled
+                    } else {
+                        LinkLocal::Auto
+                    }
+                } else {
+                    LinkLocal::Auto
+                }
+            } else {
+                LinkLocal::Disabled
+            }
+        } else {
+            LinkLocal::Default
         };
 
         let mut addresses: Vec<IpInet> = vec![];
@@ -693,6 +725,7 @@ impl Interface {
             dhcp4_settings,
             dhcp6_settings,
             ip6_privacy,
+            link_local4,
             ..Default::default()
         };
         Ok(ipconfig_result)
@@ -736,6 +769,29 @@ impl TryFrom<&Route> for IpRoute {
     }
 }
 
+pub fn check_extra_flags(flags_a: &str, flags_b: &str, diff_flags: &str) -> bool {
+    let flags_a: HashSet<&str> = flags_a
+        .split(',')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    let flags_b: HashSet<&str> = flags_b
+        .split(',')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    let diff_flags: HashSet<&str> = diff_flags
+        .split(',')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    let calculated_diff: HashSet<&str> = flags_a.symmetric_difference(&flags_b).copied().collect();
+    calculated_diff == diff_flags
+}
+
 fn has_unhandled_field(interface: &Interface) -> bool {
     let mut warnings = false;
 
@@ -763,7 +819,13 @@ fn has_unhandled_field(interface: &Interface) -> bool {
 
     if let Some(ipv4_dhcp) = &interface.ipv4_dhcp {
         let ipv4_dhcp_default = Ipv4Dhcp::default();
-        if ipv4_dhcp.flags != ipv4_dhcp_default.flags {
+        if ipv4_dhcp.flags != ipv4_dhcp_default.flags
+            && !(check_extra_flags(
+                ipv4_dhcp.flags.as_str(),
+                ipv4_dhcp_default.flags.as_str(),
+                "primary",
+            ) && interface.ipv4_auto.is_some())
+        {
             log::warn!(
                 "Unhandled field in interface {}: {}",
                 interface.name,
@@ -1076,6 +1138,89 @@ mod tests {
                 2
             );
         });
+    }
+
+    #[test]
+    fn test_check_extra_flags() {
+        assert!(check_extra_flags("A, B,C ", " C,D ,E", "A,B,D,E"));
+        assert!(!check_extra_flags("A, B,C ", " C,D ,E", "A,B,D,E,X"));
+        assert!(check_extra_flags("A,B,C", "C,B,A", ""));
+        assert!(check_extra_flags("A,B,C", "C,B,A,E", "E"));
+    }
+
+    #[test]
+    fn test_autoip() {
+        setup_default_migration_settings();
+        testing_logger::setup();
+        let ifc = Interface {
+            ipv4_dhcp: Some(Ipv4Dhcp {
+                flags: String::from("primary,group"),
+                update: String::from("default-route,dns,nis,ntp,nds,mtu,tz,boot"),
+                ..Default::default()
+            }),
+            ipv4_auto: Some(Ipv4Auto {
+                enabled: true,
+                flags: Some("fallback".to_string()),
+            }),
+            ..Default::default()
+        };
+        let conn_res = ifc.to_connection(&None).unwrap();
+        let connection = &conn_res.connections[0];
+
+        testing_logger::validate(|captured_logs| {
+            captured_logs
+                .iter()
+                .for_each(|f| println!("[{}] {}", f.level, f.body));
+            assert_eq!(
+                captured_logs
+                    .iter()
+                    .filter(|l| l.level == Level::Warn)
+                    .count(),
+                0
+            );
+        });
+
+        assert!(connection.ip_config.link_local4 == LinkLocal::Fallback);
+        assert!(!conn_res.has_warnings);
+
+        let ifc = Interface {
+            ipv4_auto: Some(Ipv4Auto {
+                enabled: true,
+                flags: Some("".to_string()),
+            }),
+            ..Default::default()
+        };
+        let conn_res = ifc.to_connection(&None).unwrap();
+        let connection = &conn_res.connections[0];
+        assert!(connection.ip_config.method4 == Ipv4Method::LinkLocal);
+        assert!(connection.ip_config.link_local4 == LinkLocal::Auto);
+        assert!(!conn_res.has_warnings);
+
+        let ifc = Interface {
+            ipv4_auto: Some(Ipv4Auto {
+                enabled: true,
+                flags: None,
+            }),
+            ..Default::default()
+        };
+        let conn_res = ifc.to_connection(&None).unwrap();
+        let connection = &conn_res.connections[0];
+        assert!(connection.ip_config.method4 == Ipv4Method::LinkLocal);
+        assert!(connection.ip_config.link_local4 == LinkLocal::Auto);
+        assert!(!conn_res.has_warnings);
+
+        let ifc = Interface {
+            ipv4_auto: Some(Ipv4Auto {
+                enabled: true,
+                flags: Some("primary".to_string()),
+            }),
+            ..Default::default()
+        };
+        let conn_res = ifc.to_connection(&None).unwrap();
+        let connection = &conn_res.connections[0];
+        assert!(connection.ip_config.method4 == Ipv4Method::LinkLocal);
+        assert!(connection.ip_config.link_local4 == LinkLocal::Enabled);
+        assert!(!conn_res.has_warnings);
     }
 
     #[test]
