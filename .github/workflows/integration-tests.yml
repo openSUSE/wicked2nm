@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        os: [tumbleweed, leap15.6]
+        os: [tumbleweed, leap15.6, leap16.0]
     env:
       IMAGE: registry.opensuse.org/home/jcronenberg/github-ci/containers_${{ matrix.os }}/wicked2nm-${{ matrix.os }}:latest
     steps:
