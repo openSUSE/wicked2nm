@@ -166,6 +166,10 @@ pub struct Ipv4Dhcp {
     #[serde(default = "default_v4_update")]
     pub update: String,
     pub hostname: Option<String>,
+    #[serde(rename = "create-cid", default)]
+    pub create_cid: CreateCid,
+    #[serde(rename = "client-id")]
+    pub client_id: Option<String>,
     // ignored
     #[serde(rename = "defer-timeout", default = "default_defer_timeout")]
     pub defer_timeout: u32,
@@ -174,6 +178,17 @@ pub struct Ipv4Dhcp {
     pub recover_lease: bool,
     #[serde(rename = "release-lease", default)]
     pub release_lease: bool,
+}
+
+#[derive(
+    Debug, PartialEq, Default, SerializeDisplay, DeserializeFromStr, EnumString, Display, Clone,
+)]
+#[strum(serialize_all = "kebab-case")]
+pub enum CreateCid {
+    #[default]
+    Rfc4361,
+    Rfc2132,
+    Disable,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -201,6 +216,8 @@ impl Default for Ipv4Dhcp {
             flags: default_flags(),
             update: default_v4_update(),
             hostname: None,
+            create_cid: CreateCid::default(),
+            client_id: None,
             defer_timeout: default_defer_timeout(),
             recover_lease: true,
             release_lease: false,
@@ -686,7 +703,15 @@ impl Interface {
                 dhcp4_settings.send_hostname = Some(false);
             }
             dhcp4_settings.send_release = Some(ipv4_dhcp.release_lease);
-            dhcp4_settings.client_id = model::DhcpClientId::Ipv6Duid;
+            dhcp4_settings.client_id = if let Some(client_id) = &ipv4_dhcp.client_id {
+                model::DhcpClientId::Id(client_id.clone())
+            } else {
+                match ipv4_dhcp.create_cid {
+                    CreateCid::Rfc4361 => model::DhcpClientId::Ipv6Duid,
+                    CreateCid::Rfc2132 => model::DhcpClientId::Mac,
+                    CreateCid::Disable => model::DhcpClientId::None,
+                }
+            };
             dhcp4_settings.iaid = model::DhcpIaid::Mac;
             dhcp6_settings.duid = model::DhcpDuid::Llt;
         }
@@ -1028,6 +1053,54 @@ mod tests {
         assert_eq!(dhcp_connection.ip_config.method4, Ipv4Method::Auto);
         assert_eq!(dhcp_connection.ip_config.method6, Ipv6Method::Auto);
         assert_eq!(dhcp_connection.ip_config.addresses.len(), 0);
+        assert_eq!(
+            dhcp_connection
+                .ip_config
+                .dhcp4_settings
+                .as_ref()
+                .unwrap()
+                .client_id,
+            model::DhcpClientId::Ipv6Duid
+        );
+    }
+
+    #[test]
+    fn test_dhcp_create_cid() {
+        setup_default_migration_settings();
+        let tests = vec![
+            (CreateCid::Rfc4361, None, model::DhcpClientId::Ipv6Duid),
+            (CreateCid::Rfc2132, None, model::DhcpClientId::Mac),
+            (CreateCid::Disable, None, model::DhcpClientId::None),
+            (
+                CreateCid::Rfc4361,
+                Some("52:54:00:dc:8e:94".to_string()),
+                model::DhcpClientId::Id("52:54:00:dc:8e:94".to_string()),
+            ),
+        ];
+
+        for (create_cid, client_id, expected_client_id) in tests {
+            let dhcp_interface = Interface {
+                ipv4_dhcp: Some(Ipv4Dhcp {
+                    enabled: true,
+                    create_cid,
+                    client_id,
+                    ..Default::default()
+                }),
+                ..Default::default()
+            };
+
+            let dhcp_connection: model::Connection =
+                dhcp_interface.to_connection(&None).unwrap().connections[0].to_owned();
+            assert_eq!(
+                dhcp_connection
+                    .ip_config
+                    .dhcp4_settings
+                    .as_ref()
+                    .unwrap()
+                    .client_id,
+                expected_client_id
+            );
+        }
     }
 
     #[test]
