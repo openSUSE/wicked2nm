@@ -1710,7 +1710,7 @@ dependencies = [
 
 [[package]]
 name = "wicked2nm"
-version = "1.4.0"
+version = "1.4.1"
 dependencies = [
  "agama-network",
  "anyhow",
