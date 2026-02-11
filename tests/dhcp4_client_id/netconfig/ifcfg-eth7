@@ -1,0 +1,3 @@
+BOOTPROTO=dhcp
+STARTMODE=auto
+DHCLIENT_CREATE_CID="disable"
