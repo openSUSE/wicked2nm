@@ -10,7 +10,7 @@
   <ipv4:dhcp>
     <enabled>true</enabled>
     <flags>group</flags>
-    <update>default-route,dns,nis,ntp,nds,mtu,tz,boot</update>
+    <update>default-route,hostname,dns,nis,ntp,nds,mtu,tz,boot</update>
     <recover-lease>true</recover-lease>
     <release-lease>false</release-lease>
   </ipv4:dhcp>
@@ -21,7 +21,7 @@
   <ipv6:dhcp>
     <enabled>true</enabled>
     <flags>group</flags>
-    <update>dns,nis,ntp,tz,boot</update>
+    <update>hostname,dns,nis,ntp,tz,boot</update>
     <mode>auto</mode>
     <rapid-commit>true</rapid-commit>
     <recover-lease>true</recover-lease>
@@ -41,7 +41,7 @@
   <ipv4:dhcp>
     <enabled>true</enabled>
     <flags>group</flags>
-    <update>default-route,dns,nis,ntp,nds,mtu,tz,boot</update>
+    <update>default-route,hostname,dns,nis,ntp,nds,mtu,tz,boot</update>
     <recover-lease>true</recover-lease>
     <release-lease>false</release-lease>
     <client-id>52:54:00:dc:8e:94</client-id>
@@ -53,7 +53,7 @@
   <ipv6:dhcp>
     <enabled>true</enabled>
     <flags>group</flags>
-    <update>dns,nis,ntp,tz,boot</update>
+    <update>hostname,dns,nis,ntp,tz,boot</update>
     <mode>auto</mode>
     <rapid-commit>true</rapid-commit>
     <recover-lease>true</recover-lease>
@@ -73,7 +73,7 @@
   <ipv4:dhcp>
     <enabled>true</enabled>
     <flags>group</flags>
-    <update>default-route,dns,nis,ntp,nds,mtu,tz,boot</update>
+    <update>default-route,hostname,dns,nis,ntp,nds,mtu,tz,boot</update>
     <recover-lease>true</recover-lease>
     <release-lease>false</release-lease>
     <create-cid>rfc4361</create-cid>
@@ -85,7 +85,7 @@
   <ipv6:dhcp>
     <enabled>true</enabled>
     <flags>group</flags>
-    <update>dns,nis,ntp,tz,boot</update>
+    <update>hostname,dns,nis,ntp,tz,boot</update>
     <mode>auto</mode>
     <rapid-commit>true</rapid-commit>
     <recover-lease>true</recover-lease>
@@ -105,7 +105,7 @@
   <ipv4:dhcp>
     <enabled>true</enabled>
     <flags>group</flags>
-    <update>default-route,dns,nis,ntp,nds,mtu,tz,boot</update>
+    <update>default-route,hostname,dns,nis,ntp,nds,mtu,tz,boot</update>
     <recover-lease>true</recover-lease>
     <release-lease>false</release-lease>
     <create-cid>disable</create-cid>
@@ -117,7 +117,7 @@
   <ipv6:dhcp>
     <enabled>true</enabled>
     <flags>group</flags>
-    <update>dns,nis,ntp,tz,boot</update>
+    <update>hostname,dns,nis,ntp,tz,boot</update>
     <mode>auto</mode>
     <rapid-commit>true</rapid-commit>
     <recover-lease>true</recover-lease>
@@ -137,7 +137,7 @@
   <ipv4:dhcp>
     <enabled>true</enabled>
     <flags>group</flags>
-    <update>default-route,dns,nis,ntp,nds,mtu,tz,boot</update>
+    <update>default-route,hostname,dns,nis,ntp,nds,mtu,tz,boot</update>
     <recover-lease>true</recover-lease>
     <release-lease>false</release-lease>
     <create-cid>rfc2132</create-cid>
@@ -149,7 +149,7 @@
   <ipv6:dhcp>
     <enabled>true</enabled>
     <flags>group</flags>
-    <update>dns,nis,ntp,tz,boot</update>
+    <update>hostname,dns,nis,ntp,tz,boot</update>
     <mode>auto</mode>
     <rapid-commit>true</rapid-commit>
     <recover-lease>true</recover-lease>

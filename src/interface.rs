@@ -202,7 +202,7 @@ fn default_flags() -> String {
 }
 
 fn default_v4_update() -> String {
-    "default-route,dns,nis,ntp,nds,mtu,tz,boot".to_string()
+    "default-route,hostname,dns,nis,ntp,nds,mtu,tz,boot".to_string()
 }
 
 fn default_defer_timeout() -> u32 {
@@ -271,7 +271,7 @@ pub struct Ipv6Dhcp {
 }
 
 fn default_v6_dhcp_update() -> String {
-    "dns,nis,ntp,tz,boot".to_string()
+    "hostname,dns,nis,ntp,tz,boot".to_string()
 }
 
 impl Default for Ipv6Dhcp {

@@ -23,7 +23,7 @@
   <ipv4:dhcp>
     <enabled>true</enabled>
     <flags>group</flags>
-    <update>default-route,dns,nis,ntp,nds,mtu,tz,boot</update>
+    <update>default-route,hostname,dns,nis,ntp,nds,mtu,tz,boot</update>
     <defer-timeout>15</defer-timeout>
     <recover-lease>true</recover-lease>
     <release-lease>false</release-lease>
@@ -35,7 +35,7 @@
   <ipv6:dhcp>
     <enabled>true</enabled>
     <flags>group</flags>
-    <update>dns,nis,ntp,tz,boot</update>
+    <update>hostname,dns,nis,ntp,tz,boot</update>
     <mode>auto</mode>
     <rapid-commit>true</rapid-commit>
     <defer-timeout>15</defer-timeout>

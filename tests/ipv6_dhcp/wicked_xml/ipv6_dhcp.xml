@@ -16,7 +16,7 @@
   </ipv6>
   <ipv6:dhcp>
     <enabled>true</enabled>
-    <update>dns,nis,ntp,tz,boot</update>
+    <update>hostname,dns,nis,ntp,tz,boot</update>
     <mode>auto</mode>
     <rapid-commit>true</rapid-commit>
     <hostname>dev3</hostname>
@@ -44,7 +44,7 @@
   </ipv6>
   <ipv6:dhcp>
     <enabled>true</enabled>
-    <update>dns,nis,ntp,tz,boot</update>
+    <update>hostname,dns,nis,ntp,tz,boot</update>
     <mode>managed</mode>
     <rapid-commit>true</rapid-commit>
     <hostname>dev3</hostname>
