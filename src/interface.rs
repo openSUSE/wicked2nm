@@ -817,6 +817,38 @@ pub fn check_extra_flags(flags_a: &str, flags_b: &str, diff_flags: &str) -> bool
     calculated_diff == diff_flags
 }
 
+fn check_dhcp_update(update: &str, default_update: &str, interface_name: &str, dhcp_type: &str) {
+    let default_set: HashSet<&str> = default_update
+        .split(',')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    let update_set: HashSet<&str> = update
+        .split(',')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    for missing in default_set.difference(&update_set) {
+        log::info!(
+            "{} in interface {} is missing default entry: {}",
+            dhcp_type,
+            interface_name,
+            missing
+        );
+    }
+
+    for added in update_set.difference(&default_set) {
+        log::info!(
+            "{} in interface {} has extra entry: {}",
+            dhcp_type,
+            interface_name,
+            added
+        );
+    }
+}
+
 fn has_unhandled_field(interface: &Interface) -> bool {
     let mut warnings = false;
 
@@ -858,13 +890,12 @@ fn has_unhandled_field(interface: &Interface) -> bool {
             );
             warnings = true;
         }
-        if ipv4_dhcp.update != ipv4_dhcp_default.update {
-            log::info!(
-                "Unhandled field in interface {}: {}",
-                interface.name,
-                stringify!(ipv4_dhcp.update)
-            );
-        }
+        check_dhcp_update(
+            &ipv4_dhcp.update,
+            &ipv4_dhcp_default.update,
+            &interface.name,
+            "ipv4_dhcp.update",
+        );
         if ipv4_dhcp.defer_timeout != ipv4_dhcp_default.defer_timeout {
             log::warn!(
                 "Unhandled field in interface {}: {}",
@@ -894,13 +925,12 @@ fn has_unhandled_field(interface: &Interface) -> bool {
             warnings = true;
         }
 
-        if ipv6_dhcp.update != ipv6_dhcp_default.update {
-            log::info!(
-                "Unhandled field in interface {}: {}",
-                interface.name,
-                stringify!(ipv6_dhcp.update)
-            );
-        }
+        check_dhcp_update(
+            &ipv6_dhcp.update,
+            &ipv6_dhcp_default.update,
+            &interface.name,
+            "ipv6_dhcp.update",
+        );
         if ipv6_dhcp.rapid_commit != ipv6_dhcp_default.rapid_commit {
             log::warn!(
                 "Unhandled field in interface {}: {}",
@@ -1208,7 +1238,7 @@ mod tests {
                     .iter()
                     .filter(|l| l.level == Level::Info)
                     .count(),
-                2
+                17
             );
         });
     }
@@ -1228,7 +1258,7 @@ mod tests {
         let ifc = Interface {
             ipv4_dhcp: Some(Ipv4Dhcp {
                 flags: String::from("primary,group"),
-                update: String::from("default-route,dns,nis,ntp,nds,mtu,tz,boot"),
+                update: String::from("default-route,hostname,dns,nis,ntp,nds,mtu,tz,boot"),
                 ..Default::default()
             }),
             ipv4_auto: Some(Ipv4Auto {
@@ -1248,6 +1278,13 @@ mod tests {
                 captured_logs
                     .iter()
                     .filter(|l| l.level == Level::Warn)
+                    .count(),
+                0
+            );
+            assert_eq!(
+                captured_logs
+                    .iter()
+                    .filter(|l| l.level == Level::Info)
                     .count(),
                 0
             );
