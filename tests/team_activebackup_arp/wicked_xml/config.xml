@@ -1,0 +1,87 @@
+<interface origin="compat:suse:/tests/team_activebackup_arp/netconfig/ifcfg-eth10">
+  <name>eth10</name>
+  <control>
+    <mode>hotplug</mode>
+  </control>
+  <link>
+    <master>team0</master>
+    <port type="team">
+      <prio>50</prio>
+    </port>
+  </link>
+  <ipv4>
+    <enabled>false</enabled>
+  </ipv4>
+  <ipv6>
+    <enabled>false</enabled>
+  </ipv6>
+</interface>
+<interface origin="compat:suse:/tests/team_activebackup_arp/netconfig/ifcfg-eth9">
+  <name>eth9</name>
+  <control>
+    <mode>hotplug</mode>
+  </control>
+  <link>
+    <master>team0</master>
+    <port type="team">
+      <prio>100</prio>
+      <sticky>true</sticky>
+    </port>
+  </link>
+  <ipv4>
+    <enabled>false</enabled>
+  </ipv4>
+  <ipv6>
+    <enabled>false</enabled>
+  </ipv6>
+</interface>
+<interface origin="compat:suse:/tests/team_activebackup_arp/netconfig/ifcfg-team0">
+  <name>team0</name>
+  <control>
+    <mode>boot</mode>
+  </control>
+  <team>
+    <runner name="activebackup">
+      <hwaddr_policy>only_active</hwaddr_policy>
+    </runner>
+    <link_watch>
+      <watch name="arp_ping">
+        <target_host>192.168.50.254</target_host>
+        <interval>500</interval>
+        <validate_active>true</validate_active>
+        <missed_max>5</missed_max>
+      </watch>
+    </link_watch>
+  </team>
+  <link/>
+  <ipv4>
+    <enabled>true</enabled>
+  </ipv4>
+  <ipv4:static>
+    <address>
+      <local>192.168.50.1/24</local>
+    </address>
+  </ipv4:static>
+  <ipv6>
+    <enabled>true</enabled>
+    <privacy>prefer-public</privacy>
+  </ipv6>
+</interface>
+<interface origin="compat:suse:/tests/team_activebackup_arp/netconfig/ifcfg-eth8">
+  <name>eth8</name>
+  <control>
+    <mode>hotplug</mode>
+  </control>
+  <link>
+    <master>team0</master>
+    <port type="team">
+      <prio>50</prio>
+    </port>
+  </link>
+  <ipv4>
+    <enabled>false</enabled>
+  </ipv4>
+  <ipv6>
+    <enabled>false</enabled>
+  </ipv6>
+</interface>

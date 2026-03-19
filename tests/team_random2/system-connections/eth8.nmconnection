@@ -1,0 +1,10 @@
+[connection]
+id=eth8
+type=ethernet
+interface-name=eth8
+master=team0
+slave-type=bond
+
+[ethernet]
+
+[match]

@@ -1,0 +1,65 @@
+<interface origin="compat:suse:/tests/team_activebackup_nsna2/netconfig/ifcfg-eth9">
+  <name>eth9</name>
+  <control>
+    <mode>hotplug</mode>
+  </control>
+  <link>
+    <master>team0</master>
+    <port type="team"/>
+  </link>
+  <ipv4>
+    <enabled>false</enabled>
+  </ipv4>
+  <ipv6>
+    <enabled>true</enabled>
+    <accept-ra>disable</accept-ra>
+  </ipv6>
+</interface>
+<interface origin="compat:suse:/tests/team_activebackup_nsna2/netconfig/ifcfg-team0">
+  <name>team0</name>
+  <control>
+    <mode>boot</mode>
+  </control>
+  <team>
+    <runner name="activebackup">
+      <hwaddr_policy>only_active</hwaddr_policy>
+    </runner>
+    <link_watch>
+      <watch name="nsna_ping">
+        <target_host>2001:db8::254</target_host>
+        <interval>500</interval>
+        <missed_max>5</missed_max>
+      </watch>
+    </link_watch>
+  </team>
+  <link/>
+  <ipv4>
+    <enabled>true</enabled>
+  </ipv4>
+  <ipv6>
+    <enabled>true</enabled>
+    <privacy>prefer-public</privacy>
+  </ipv6>
+  <ipv6:static>
+    <address>
+      <local>2001:db8::1/64</local>
+    </address>
+  </ipv6:static>
+</interface>
+<interface origin="compat:suse:/tests/team_activebackup_nsna2/netconfig/ifcfg-eth8">
+  <name>eth8</name>
+  <control>
+    <mode>hotplug</mode>
+  </control>
+  <link>
+    <master>team0</master>
+    <port type="team"/>
+  </link>
+  <ipv4>
+    <enabled>false</enabled>
+  </ipv4>
+  <ipv6>
+    <enabled>true</enabled>
+    <accept-ra>disable</accept-ra>
+  </ipv6>
+</interface>

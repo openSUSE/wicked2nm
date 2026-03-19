@@ -112,6 +112,148 @@ fn update_parent_connection(
     Ok(())
 }
 
+struct TeamPortOptions {
+    name: String,
+    prio: Option<u32>,
+    sticky: bool,
+}
+
+fn apply_team_port_options_to_bond(
+    connections: &mut [Connection],
+    original_parents: &HashMap<Uuid, Link>,
+) -> bool {
+    let mut has_warnings = false;
+
+    // Build a map of bond UUID -> list of team port options
+    let mut bond_ports: HashMap<Uuid, Vec<TeamPortOptions>> = HashMap::new();
+
+    for connection in connections.iter() {
+        let Some(controller_uuid) = connection.controller else {
+            continue;
+        };
+        // Check if this port has team port options
+        let Some(link) = original_parents.get(&connection.uuid) else {
+            continue;
+        };
+        let Some(port) = &link.port else {
+            continue;
+        };
+
+        if port.port_type == LinkPortType::Team {
+            let port_name = connection
+                .interface
+                .as_ref()
+                .unwrap_or(&connection.id)
+                .clone();
+            bond_ports
+                .entry(controller_uuid)
+                .or_default()
+                .push(TeamPortOptions {
+                    name: port_name,
+                    prio: port.prio,
+                    sticky: port.sticky,
+                });
+        }
+    }
+
+    // Now update bond options based on collected port info
+    for connection in connections.iter_mut() {
+        let ConnectionConfig::Bond(bond_config) = &mut connection.config else {
+            continue;
+        };
+
+        let Some(ports) = bond_ports.get(&connection.uuid) else {
+            continue;
+        };
+
+        let ports_with_prio: Vec<&TeamPortOptions> =
+            ports.iter().filter(|p| p.prio.is_some()).collect();
+        let sticky_ports: Vec<&TeamPortOptions> = ports.iter().filter(|p| p.sticky).collect();
+
+        // If no port has prio there is nothing to do but
+        // warn about sticky ports
+        if ports_with_prio.is_empty() {
+            for sticky_port in sticky_ports {
+                log::warn!(
+                    "Team port '{}' is marked as sticky. Bond requires a primary port (with prio set) to use sticky behavior.",
+                    sticky_port.name
+                );
+                has_warnings = true;
+            }
+            continue;
+        }
+
+        let max_prio = ports_with_prio
+            .iter()
+            .map(|p| p.prio.unwrap())
+            .max()
+            .unwrap();
+        let ports_with_max_prio: Vec<&TeamPortOptions> = ports_with_prio
+            .iter()
+            .filter(|p| p.prio.unwrap() == max_prio)
+            .copied()
+            .collect();
+
+        // Multiple ports with same highest priority - ambiguous
+        if ports_with_max_prio.len() > 1 {
+            let names: Vec<&str> = ports_with_max_prio
+                .iter()
+                .map(|p| p.name.as_str())
+                .collect();
+            log::warn!(
+                "Team has multiple ports {:?} with the same highest prio={}. Bond requires a single primary port, not setting primary.",
+                names,
+                max_prio
+            );
+            has_warnings = true;
+            continue;
+        }
+
+        let port = ports_with_max_prio[0];
+        bond_config
+            .options
+            .0
+            .insert(String::from("primary"), port.name.clone());
+
+        if port.sticky {
+            bond_config
+                .options
+                .0
+                .insert(String::from("primary_reselect"), String::from("failure"));
+        }
+
+        // Check if mapping is perfect (only 2 different priority values)
+        let unique_prios: std::collections::HashSet<u32> =
+            ports_with_prio.iter().map(|p| p.prio.unwrap()).collect();
+
+        if unique_prios.len() > 2 {
+            log::warn!(
+                "Team has {} different priority levels, but bond only supports primary vs backup (2 levels). Port '{}' with prio={} set as bond primary.",
+                unique_prios.len(),
+                port.name,
+                port.prio.unwrap()
+            );
+            has_warnings = true;
+        } else {
+            log::info!(
+                "Team port '{}' with highest prio={} mapped to bond primary",
+                port.name,
+                port.prio.unwrap()
+            );
+        }
+
+        // Warn if other ports are sticky (bond doesn't support per-port sticky)
+        for sticky_port in &sticky_ports {
+            if sticky_port.name != port.name {
+                log::warn!("Team port '{}' is marked as sticky. Bonding only allows the primary port to be sticky.", sticky_port.name);
+                has_warnings = true;
+            }
+        }
+    }
+
+    has_warnings
+}
+
 fn create_lo_connection() -> Connection {
     Connection {
         id: "lo".to_string(),
@@ -178,6 +320,11 @@ pub fn to_networkstate(
                                 port_type: LinkPortType::OvsBridge,
                                 priority: None,
                                 path_cost: None,
+                                queue_id: None,
+                                prio: None,
+                                sticky: false,
+                                lacp_key: None,
+                                lacp_prio: None,
                             }),
                             ..Default::default()
                         };
@@ -188,6 +335,9 @@ pub fn to_networkstate(
             connection_result.connections.push(connection);
         }
     }
+
+    // Store original parents before they get consumed by update_parent_connection loop
+    let original_parents = parents.clone();
 
     loop {
         // This loop is needed, as we need to map the "ovs-port" of a "fake bridge"
@@ -211,6 +361,10 @@ pub fn to_networkstate(
             anyhow::bail!("Unexpected error, port connection is missing controller: {connections}");
         }
     }
+
+    // Apply team port options (prio, sticky) to bond configuration
+    connection_result.has_warnings |=
+        apply_team_port_options_to_bond(&mut connection_result.connections, &original_parents);
 
     if settings.activate_connections {
         let system_interfaces = list_system_interfaces()?;
@@ -302,4 +456,1003 @@ fn list_system_interfaces() -> Result<HashSet<String>, anyhow::Error> {
     }
 
     Ok(interface_names)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::bond::{Bond as WickedBond, WickedBondMode};
+    use crate::interface::{Interface, Link, LinkPort, LinkPortType};
+    use crate::ovs::OvsBridge;
+    use crate::reader::InterfacesResult;
+    use crate::team::{Runner, RunnerName, Team as WickedTeam};
+    use log::Level;
+
+    #[test]
+    fn test_apply_team_port_options_prio_to_primary() {
+        testing_logger::setup();
+        let _ = MIGRATION_SETTINGS.set(crate::MigrationSettings::default());
+
+        let interfaces = vec![
+            // Team port 1 (eth0) with lower priority
+            Interface {
+                name: "eth0".to_string(),
+                link: Link {
+                    master: Some("team0".to_string()),
+                    mtu: None,
+                    port: Some(LinkPort {
+                        port_type: LinkPortType::Team,
+                        priority: None,
+                        path_cost: None,
+                        queue_id: None,
+                        prio: Some(10),
+                        sticky: false,
+                        lacp_key: None,
+                        lacp_prio: None,
+                    }),
+                },
+                ..Default::default()
+            },
+            // Team port 2 (eth1) with higher priority
+            Interface {
+                name: "eth1".to_string(),
+                link: Link {
+                    master: Some("team0".to_string()),
+                    mtu: None,
+                    port: Some(LinkPort {
+                        port_type: LinkPortType::Team,
+                        priority: None,
+                        path_cost: None,
+                        queue_id: None,
+                        prio: Some(100), // Higher priority
+                        sticky: false,
+                        lacp_key: None,
+                        lacp_prio: None,
+                    }),
+                },
+                ..Default::default()
+            },
+            // Team controller
+            Interface {
+                name: "team0".to_string(),
+                team: Some(WickedTeam {
+                    runner: Some(Runner {
+                        name: RunnerName::ActiveBackup,
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+        ];
+
+        let interfaces_result = InterfacesResult {
+            interfaces,
+            netconfig: None,
+            netconfig_dhcp: None,
+            has_warnings: false,
+        };
+
+        let result = to_networkstate(&interfaces_result).unwrap();
+
+        let team0 = result
+            .network_state
+            .get_connection("team0")
+            .expect("team0 should exist");
+
+        if let ConnectionConfig::Bond(bond) = &team0.config {
+            assert_eq!(bond.options.0.get("primary").unwrap(), "eth1");
+        } else {
+            panic!("Expected bond config");
+        }
+    }
+
+    #[test]
+    fn test_apply_team_port_options_sticky_to_primary_reselect() {
+        testing_logger::setup();
+        let _ = MIGRATION_SETTINGS.set(crate::MigrationSettings::default());
+
+        let interfaces = vec![
+            // Team port 1 (eth0) with highest priority and sticky
+            Interface {
+                name: "eth0".to_string(),
+                link: Link {
+                    master: Some("team0".to_string()),
+                    mtu: None,
+                    port: Some(LinkPort {
+                        port_type: LinkPortType::Team,
+                        priority: None,
+                        path_cost: None,
+                        queue_id: None,
+                        prio: Some(100), // Highest prio and sticky
+                        sticky: true,
+                        lacp_key: None,
+                        lacp_prio: None,
+                    }),
+                },
+                ..Default::default()
+            },
+            // Team port 2 (eth1) with lower priority
+            Interface {
+                name: "eth1".to_string(),
+                link: Link {
+                    master: Some("team0".to_string()),
+                    mtu: None,
+                    port: Some(LinkPort {
+                        port_type: LinkPortType::Team,
+                        priority: None,
+                        path_cost: None,
+                        queue_id: None,
+                        prio: Some(50), // Lower prio, not sticky
+                        sticky: false,
+                        lacp_key: None,
+                        lacp_prio: None,
+                    }),
+                },
+                ..Default::default()
+            },
+            // Team controller
+            Interface {
+                name: "team0".to_string(),
+                team: Some(WickedTeam {
+                    runner: Some(Runner {
+                        name: RunnerName::ActiveBackup,
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+        ];
+
+        let interfaces_result = InterfacesResult {
+            interfaces,
+            netconfig: None,
+            netconfig_dhcp: None,
+            has_warnings: false,
+        };
+
+        let result = to_networkstate(&interfaces_result).unwrap();
+        assert!(!result.has_warnings); // No warnings - perfect mapping
+
+        let team0 = result
+            .network_state
+            .get_connection("team0")
+            .expect("team0 should exist");
+
+        if let ConnectionConfig::Bond(bond) = &team0.config {
+            assert_eq!(bond.options.0.get("primary").unwrap(), "eth0");
+            assert_eq!(bond.options.0.get("primary_reselect").unwrap(), "failure");
+        } else {
+            panic!("Expected bond config");
+        }
+    }
+
+    #[test]
+    fn test_apply_team_port_options_multiple_prio_warns() {
+        testing_logger::setup();
+        let _ = MIGRATION_SETTINGS.set(crate::MigrationSettings::default());
+
+        let interfaces = vec![
+            // Team port 1 (eth0) with low priority
+            Interface {
+                name: "eth0".to_string(),
+                link: Link {
+                    master: Some("team0".to_string()),
+                    mtu: None,
+                    port: Some(LinkPort {
+                        port_type: LinkPortType::Team,
+                        priority: None,
+                        path_cost: None,
+                        queue_id: None,
+                        prio: Some(10),
+                        sticky: false,
+                        lacp_key: None,
+                        lacp_prio: None,
+                    }),
+                },
+                ..Default::default()
+            },
+            // Team port 2 (eth1) with medium priority
+            Interface {
+                name: "eth1".to_string(),
+                link: Link {
+                    master: Some("team0".to_string()),
+                    mtu: None,
+                    port: Some(LinkPort {
+                        port_type: LinkPortType::Team,
+                        priority: None,
+                        path_cost: None,
+                        queue_id: None,
+                        prio: Some(50),
+                        sticky: false,
+                        lacp_key: None,
+                        lacp_prio: None,
+                    }),
+                },
+                ..Default::default()
+            },
+            // Team port 3 (eth2) with highest priority
+            Interface {
+                name: "eth2".to_string(),
+                link: Link {
+                    master: Some("team0".to_string()),
+                    mtu: None,
+                    port: Some(LinkPort {
+                        port_type: LinkPortType::Team,
+                        priority: None,
+                        path_cost: None,
+                        queue_id: None,
+                        prio: Some(100),
+                        sticky: false,
+                        lacp_key: None,
+                        lacp_prio: None,
+                    }),
+                },
+                ..Default::default()
+            },
+            // Team controller
+            Interface {
+                name: "team0".to_string(),
+                team: Some(WickedTeam {
+                    runner: Some(Runner {
+                        name: RunnerName::ActiveBackup,
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+        ];
+
+        let interfaces_result = InterfacesResult {
+            interfaces,
+            netconfig: None,
+            netconfig_dhcp: None,
+            has_warnings: false,
+        };
+
+        let result = to_networkstate(&interfaces_result).unwrap();
+        assert!(result.has_warnings);
+
+        let team0 = result
+            .network_state
+            .get_connection("team0")
+            .expect("team0 should exist");
+
+        if let ConnectionConfig::Bond(bond) = &team0.config {
+            assert_eq!(bond.options.0.get("primary").unwrap(), "eth2");
+        } else {
+            panic!("Expected bond config");
+        }
+
+        testing_logger::validate(|captured_logs| {
+            let warnings: Vec<_> = captured_logs
+                .iter()
+                .filter(|l| l.level == Level::Warn)
+                .collect();
+            assert_eq!(warnings.len(), 1);
+            assert!(warnings[0].body.contains("3 different priority levels"));
+            assert!(warnings[0].body.contains("primary vs backup"));
+        });
+    }
+
+    #[test]
+    fn test_apply_team_port_options_non_primary_sticky_warns() {
+        testing_logger::setup();
+        let _ = MIGRATION_SETTINGS.set(crate::MigrationSettings::default());
+
+        let interfaces = vec![
+            // Team port 1 (eth0) with highest priority, not sticky
+            Interface {
+                name: "eth0".to_string(),
+                link: Link {
+                    master: Some("team0".to_string()),
+                    mtu: None,
+                    port: Some(LinkPort {
+                        port_type: LinkPortType::Team,
+                        priority: None,
+                        path_cost: None,
+                        queue_id: None,
+                        prio: Some(100), // Highest prio, not sticky
+                        sticky: false,
+                        lacp_key: None,
+                        lacp_prio: None,
+                    }),
+                },
+                ..Default::default()
+            },
+            // Team port 2 (eth1) with lower priority, but sticky
+            Interface {
+                name: "eth1".to_string(),
+                link: Link {
+                    master: Some("team0".to_string()),
+                    mtu: None,
+                    port: Some(LinkPort {
+                        port_type: LinkPortType::Team,
+                        priority: None,
+                        path_cost: None,
+                        queue_id: None,
+                        prio: Some(50), // Lower prio, but sticky - should warn
+                        sticky: true,
+                        lacp_key: None,
+                        lacp_prio: None,
+                    }),
+                },
+                ..Default::default()
+            },
+            // Team controller
+            Interface {
+                name: "team0".to_string(),
+                team: Some(WickedTeam {
+                    runner: Some(Runner {
+                        name: RunnerName::ActiveBackup,
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+        ];
+
+        let interfaces_result = InterfacesResult {
+            interfaces,
+            netconfig: None,
+            netconfig_dhcp: None,
+            has_warnings: false,
+        };
+
+        let result = to_networkstate(&interfaces_result).unwrap();
+        assert!(result.has_warnings);
+
+        let team0 = result
+            .network_state
+            .get_connection("team0")
+            .expect("team0 should exist");
+
+        if let ConnectionConfig::Bond(bond) = &team0.config {
+            assert_eq!(bond.options.0.get("primary").unwrap(), "eth0");
+            // primary_reselect should NOT be set because highest prio is not sticky
+            assert!(!bond.options.0.contains_key("primary_reselect"));
+        } else {
+            panic!("Expected bond config");
+        }
+
+        testing_logger::validate(|captured_logs| {
+            let warnings: Vec<_> = captured_logs
+                .iter()
+                .filter(|l| l.level == Level::Warn)
+                .collect();
+            assert_eq!(warnings.len(), 1);
+            assert!(warnings[0].body.contains("eth1"));
+        });
+    }
+
+    #[test]
+    fn test_apply_team_port_options_sticky_without_prio_warns() {
+        testing_logger::setup();
+        let _ = MIGRATION_SETTINGS.set(crate::MigrationSettings::default());
+
+        let interfaces = vec![
+            // Team port 1 (eth0) with sticky but no prio
+            Interface {
+                name: "eth0".to_string(),
+                link: Link {
+                    master: Some("team0".to_string()),
+                    mtu: None,
+                    port: Some(LinkPort {
+                        port_type: LinkPortType::Team,
+                        priority: None,
+                        path_cost: None,
+                        queue_id: None,
+                        prio: None,   // No prio set
+                        sticky: true, // But sticky is set
+                        lacp_key: None,
+                        lacp_prio: None,
+                    }),
+                },
+                ..Default::default()
+            },
+            // Team controller
+            Interface {
+                name: "team0".to_string(),
+                team: Some(WickedTeam {
+                    runner: Some(Runner {
+                        name: RunnerName::ActiveBackup,
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+        ];
+
+        let interfaces_result = InterfacesResult {
+            interfaces,
+            netconfig: None,
+            netconfig_dhcp: None,
+            has_warnings: false,
+        };
+
+        let result = to_networkstate(&interfaces_result).unwrap();
+        assert!(result.has_warnings);
+
+        let team0 = result
+            .network_state
+            .get_connection("team0")
+            .expect("team0 should exist");
+
+        if let ConnectionConfig::Bond(bond) = &team0.config {
+            // Should NOT set primary_reselect because no prio is set
+            assert!(!bond.options.0.contains_key("primary_reselect"));
+        } else {
+            panic!("Expected bond config");
+        }
+
+        testing_logger::validate(|captured_logs| {
+            let warnings: Vec<_> = captured_logs
+                .iter()
+                .filter(|l| l.level == Level::Warn)
+                .collect();
+            assert_eq!(warnings.len(), 1);
+            assert!(warnings[0].body.contains("eth0"));
+        });
+    }
+
+    #[test]
+    fn test_apply_team_port_options_duplicate_prio_warns() {
+        testing_logger::setup();
+        let _ = MIGRATION_SETTINGS.set(crate::MigrationSettings::default());
+
+        let interfaces = vec![
+            // Team port 1 (eth0) with prio 100
+            Interface {
+                name: "eth0".to_string(),
+                link: Link {
+                    master: Some("team0".to_string()),
+                    mtu: None,
+                    port: Some(LinkPort {
+                        port_type: LinkPortType::Team,
+                        priority: None,
+                        path_cost: None,
+                        queue_id: None,
+                        prio: Some(100), // Same as eth1
+                        sticky: true, // Sticky, but shouldn't set primary_reselect due to ambiguous priority
+                        lacp_key: None,
+                        lacp_prio: None,
+                    }),
+                },
+                ..Default::default()
+            },
+            // Team port 2 (eth1) with same prio 100
+            Interface {
+                name: "eth1".to_string(),
+                link: Link {
+                    master: Some("team0".to_string()),
+                    mtu: None,
+                    port: Some(LinkPort {
+                        port_type: LinkPortType::Team,
+                        priority: None,
+                        path_cost: None,
+                        queue_id: None,
+                        prio: Some(100), // Same as eth0
+                        sticky: false,
+                        lacp_key: None,
+                        lacp_prio: None,
+                    }),
+                },
+                ..Default::default()
+            },
+            // Team controller
+            Interface {
+                name: "team0".to_string(),
+                team: Some(WickedTeam {
+                    runner: Some(Runner {
+                        name: RunnerName::ActiveBackup,
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+        ];
+
+        let interfaces_result = InterfacesResult {
+            interfaces,
+            netconfig: None,
+            netconfig_dhcp: None,
+            has_warnings: false,
+        };
+
+        let result = to_networkstate(&interfaces_result).unwrap();
+        assert!(result.has_warnings);
+
+        let team0 = result
+            .network_state
+            .get_connection("team0")
+            .expect("team0 should exist");
+
+        if let ConnectionConfig::Bond(bond) = &team0.config {
+            // Should NOT set primary because of ambiguous priority
+            assert!(!bond.options.0.contains_key("primary"));
+            assert!(!bond.options.0.contains_key("primary_reselect"));
+        } else {
+            panic!("Expected bond config");
+        }
+
+        testing_logger::validate(|captured_logs| {
+            let warnings: Vec<_> = captured_logs
+                .iter()
+                .filter(|l| l.level == Level::Warn)
+                .collect();
+            assert_eq!(warnings.len(), 1);
+            // Should mention both ports and the duplicate priority
+            assert!(warnings[0].body.contains("eth0"));
+            assert!(warnings[0].body.contains("eth1"));
+            assert!(warnings[0].body.contains("100"));
+            assert!(warnings[0].body.contains("same highest prio"));
+        });
+    }
+
+    #[test]
+    fn test_apply_team_port_options_clear_primary_with_duplicate_backups() {
+        testing_logger::setup();
+        let _ = MIGRATION_SETTINGS.set(crate::MigrationSettings::default());
+
+        let interfaces = vec![
+            // Team port 1 (eth0) with highest priority
+            Interface {
+                name: "eth0".to_string(),
+                link: Link {
+                    master: Some("team0".to_string()),
+                    mtu: None,
+                    port: Some(LinkPort {
+                        port_type: LinkPortType::Team,
+                        priority: None,
+                        path_cost: None,
+                        queue_id: None,
+                        prio: Some(100), // Highest - should be primary
+                        sticky: false,
+                        lacp_key: None,
+                        lacp_prio: None,
+                    }),
+                },
+                ..Default::default()
+            },
+            // Team port 2 (eth1) with lower priority
+            Interface {
+                name: "eth1".to_string(),
+                link: Link {
+                    master: Some("team0".to_string()),
+                    mtu: None,
+                    port: Some(LinkPort {
+                        port_type: LinkPortType::Team,
+                        priority: None,
+                        path_cost: None,
+                        queue_id: None,
+                        prio: Some(50), // Lower - backup
+                        sticky: false,
+                        lacp_key: None,
+                        lacp_prio: None,
+                    }),
+                },
+                ..Default::default()
+            },
+            // Team port 3 (eth2) with same priority as eth1
+            Interface {
+                name: "eth2".to_string(),
+                link: Link {
+                    master: Some("team0".to_string()),
+                    mtu: None,
+                    port: Some(LinkPort {
+                        port_type: LinkPortType::Team,
+                        priority: None,
+                        path_cost: None,
+                        queue_id: None,
+                        prio: Some(50), // Same as eth1 - also backup
+                        sticky: false,
+                        lacp_key: None,
+                        lacp_prio: None,
+                    }),
+                },
+                ..Default::default()
+            },
+            // Team controller
+            Interface {
+                name: "team0".to_string(),
+                team: Some(WickedTeam {
+                    runner: Some(Runner {
+                        name: RunnerName::ActiveBackup,
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+        ];
+
+        let interfaces_result = InterfacesResult {
+            interfaces,
+            netconfig: None,
+            netconfig_dhcp: None,
+            has_warnings: false,
+        };
+
+        let result = to_networkstate(&interfaces_result).unwrap();
+        assert!(!result.has_warnings); // Should map cleanly - only 2 priority levels (100 and 50)
+
+        let team0 = result
+            .network_state
+            .get_connection("team0")
+            .expect("team0 should exist");
+
+        if let ConnectionConfig::Bond(bond) = &team0.config {
+            // eth0 should be primary (highest prio)
+            assert_eq!(bond.options.0.get("primary").unwrap(), "eth0");
+            // No primary_reselect since not sticky
+            assert!(!bond.options.0.contains_key("primary_reselect"));
+        } else {
+            panic!("Expected bond config");
+        }
+
+        testing_logger::validate(|captured_logs| {
+            let warnings: Vec<_> = captured_logs
+                .iter()
+                .filter(|l| l.level == Level::Warn)
+                .collect();
+            // No warnings - only 2 priority levels
+            assert_eq!(warnings.len(), 0);
+        });
+    }
+
+    #[test]
+    fn test_team_single_prio_multiple_interfaces() {
+        let _ = MIGRATION_SETTINGS.set(crate::MigrationSettings::default());
+
+        // Create a team with 3 ports where only one has a prio
+        let interfaces = vec![
+            // Team port 1 (eth0) - has prio
+            Interface {
+                name: "eth0".to_string(),
+                link: Link {
+                    master: Some("team0".to_string()),
+                    mtu: None,
+                    port: Some(LinkPort {
+                        port_type: LinkPortType::Team,
+                        priority: None,
+                        path_cost: None,
+                        queue_id: None,
+                        prio: Some(100), // Only this port has a prio
+                        sticky: false,
+                        lacp_key: None,
+                        lacp_prio: None,
+                    }),
+                },
+                ..Default::default()
+            },
+            // Team port 2 (eth1) - no prio
+            Interface {
+                name: "eth1".to_string(),
+                link: Link {
+                    master: Some("team0".to_string()),
+                    mtu: None,
+                    port: Some(LinkPort {
+                        port_type: LinkPortType::Team,
+                        priority: None,
+                        path_cost: None,
+                        queue_id: None,
+                        prio: None, // No prio
+                        sticky: false,
+                        lacp_key: None,
+                        lacp_prio: None,
+                    }),
+                },
+                ..Default::default()
+            },
+            // Team port 3 (eth2) - no prio
+            Interface {
+                name: "eth2".to_string(),
+                link: Link {
+                    master: Some("team0".to_string()),
+                    mtu: None,
+                    port: Some(LinkPort {
+                        port_type: LinkPortType::Team,
+                        priority: None,
+                        path_cost: None,
+                        queue_id: None,
+                        prio: None, // No prio
+                        sticky: false,
+                        lacp_key: None,
+                        lacp_prio: None,
+                    }),
+                },
+                ..Default::default()
+            },
+            // Team controller
+            Interface {
+                name: "team0".to_string(),
+                team: Some(WickedTeam {
+                    runner: Some(Runner {
+                        name: RunnerName::ActiveBackup,
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+        ];
+
+        let interfaces_result = InterfacesResult {
+            interfaces,
+            netconfig: None,
+            netconfig_dhcp: None,
+            has_warnings: false,
+        };
+
+        let result = to_networkstate(&interfaces_result).unwrap();
+
+        // Should not have warnings - single prio is unambiguous
+        assert!(!result.has_warnings);
+
+        // Verify team was converted to bond
+        let team0 = result
+            .network_state
+            .get_connection("team0")
+            .expect("team0 should exist");
+
+        if let ConnectionConfig::Bond(bond_config) = &team0.config {
+            assert_eq!(
+                bond_config.options.0.get("primary"),
+                Some(&"eth0".to_string()),
+                "eth0 should be the primary port"
+            );
+            // No primary_reselect since not sticky
+            assert!(
+                !bond_config.options.0.contains_key("primary_reselect"),
+                "primary_reselect should not be set"
+            );
+        } else {
+            panic!("team0 should have been converted to bond");
+        }
+    }
+
+    #[test]
+    fn test_to_networkstate_complex_topology() {
+        let _ = MIGRATION_SETTINGS.set(crate::MigrationSettings::default());
+
+        // Create a complex topology with:
+        // 1. A regular bond (bond0) with 2 ports (eth0, eth1)
+        // 2. A team (team0) that will be converted to bond with 2 ports (eth2 with prio+sticky, eth3)
+        // 3. An OVS bridge (ovsbr0) with 2 ports (eth4 untagged, eth5 as vlan port)
+        //
+        // NOTE: Interfaces are intentionally shuffled (ports before controllers)
+        // to ensure the migration code doesn't rely on ordering
+
+        let interfaces = vec![
+            // Team port 1 (eth2)
+            Interface {
+                name: "eth2".to_string(),
+                link: Link {
+                    master: Some("team0".to_string()),
+                    mtu: None,
+                    port: Some(LinkPort {
+                        port_type: LinkPortType::Team,
+                        priority: None,
+                        path_cost: None,
+                        queue_id: None,
+                        prio: Some(100), // Highest priority
+                        sticky: true,    // Sticky port
+                        lacp_key: None,
+                        lacp_prio: None,
+                    }),
+                },
+                ..Default::default()
+            },
+            // OVS port 1 (eth4)
+            Interface {
+                name: "eth4".to_string(),
+                link: Link {
+                    master: Some("ovsbr0".to_string()),
+                    mtu: None,
+                    port: Some(LinkPort {
+                        port_type: LinkPortType::OvsBridge,
+                        priority: None,
+                        path_cost: None,
+                        queue_id: None,
+                        prio: None,
+                        sticky: false,
+                        lacp_key: None,
+                        lacp_prio: None,
+                    }),
+                },
+                ..Default::default()
+            },
+            // Bond controller
+            Interface {
+                name: "bond0".to_string(),
+                bond: Some(WickedBond {
+                    mode: WickedBondMode::ActiveBackup,
+                    miimon: None,
+                    arpmon: None,
+                    xmit_hash_policy: None,
+                    packets_per_slave: None,
+                    tlb_dynamic_lb: None,
+                    lacp_rate: None,
+                    ad_select: None,
+                    ad_user_port_key: None,
+                    ad_actor_sys_prio: None,
+                    ad_actor_system: None,
+                    min_links: None,
+                    primary_reselect: None,
+                    primary: None,
+                    num_grat_arp: None,
+                    num_unsol_na: None,
+                    fail_over_mac: None,
+                    all_slaves_active: None,
+                    resend_igmp: None,
+                    lp_interval: None,
+                    address: None,
+                }),
+                ..Default::default()
+            },
+            // Team controller (will be converted to bond)
+            Interface {
+                name: "team0".to_string(),
+                team: Some(WickedTeam {
+                    runner: Some(Runner {
+                        name: RunnerName::ActiveBackup,
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+            // Bond port 1 (eth0)
+            Interface {
+                name: "eth0".to_string(),
+                link: Link {
+                    master: Some("bond0".to_string()),
+                    mtu: None,
+                    port: Some(LinkPort {
+                        port_type: LinkPortType::Bond,
+                        priority: None,
+                        path_cost: None,
+                        queue_id: None,
+                        prio: None,
+                        sticky: false,
+                        lacp_key: None,
+                        lacp_prio: None,
+                    }),
+                },
+                ..Default::default()
+            },
+            // OVS bridge
+            Interface {
+                name: "ovsbr0".to_string(),
+                ovs_bridge: Some(OvsBridge { vlan: None }),
+                ..Default::default()
+            },
+            // Team port 2 (eth3)
+            Interface {
+                name: "eth3".to_string(),
+                link: Link {
+                    master: Some("team0".to_string()),
+                    mtu: None,
+                    port: Some(LinkPort {
+                        port_type: LinkPortType::Team,
+                        priority: None,
+                        path_cost: None,
+                        queue_id: None,
+                        prio: Some(50), // Lower priority
+                        sticky: false,
+                        lacp_key: None,
+                        lacp_prio: None,
+                    }),
+                },
+                ..Default::default()
+            },
+            // Bond port 2 (eth1)
+            Interface {
+                name: "eth1".to_string(),
+                link: Link {
+                    master: Some("bond0".to_string()),
+                    mtu: None,
+                    port: Some(LinkPort {
+                        port_type: LinkPortType::Bond,
+                        priority: None,
+                        path_cost: None,
+                        queue_id: None,
+                        prio: None,
+                        sticky: false,
+                        lacp_key: None,
+                        lacp_prio: None,
+                    }),
+                },
+                ..Default::default()
+            },
+        ];
+
+        let interfaces_result = InterfacesResult {
+            interfaces,
+            netconfig: None,
+            netconfig_dhcp: None,
+            has_warnings: false,
+        };
+
+        let result = to_networkstate(&interfaces_result).unwrap();
+
+        let find_connection_by_interface =
+            |name: &str| result.network_state.get_connection(name).cloned();
+
+        // Verify regular bond (bond0) exists and is still a bond
+        let bond0 = find_connection_by_interface("bond0").expect("bond0 should exist");
+        assert!(
+            matches!(bond0.config, ConnectionConfig::Bond(_)),
+            "bond0 should be a bond"
+        );
+
+        // Verify team0 was converted to bond
+        let team0 = find_connection_by_interface("team0").expect("team0 should exist");
+        if let ConnectionConfig::Bond(bond_config) = &team0.config {
+            assert_eq!(
+                bond_config.options.0.get("primary"),
+                Some(&"eth2".to_string()),
+                "eth2 should be the primary port"
+            );
+            assert_eq!(
+                bond_config.options.0.get("primary_reselect"),
+                Some(&"failure".to_string()),
+                "primary_reselect should be set to failure due to sticky"
+            );
+        } else {
+            panic!("team0 should have been converted to bond");
+        }
+
+        // Verify OVS bridge exists (created with "-bridge" suffix)
+        let ovsbr0_bridge = result
+            .network_state
+            .get_connection("ovsbr0-bridge")
+            .expect("OVS bridge should exist");
+        assert!(
+            matches!(ovsbr0_bridge.config, ConnectionConfig::OvsBridge(_)),
+            "ovsbr0-bridge should be an OVS bridge"
+        );
+
+        // Verify OVS port for eth4 exists
+        let eth4_port = find_connection_by_interface("eth4").expect("eth4 should exist");
+        assert!(
+            eth4_port.controller.is_some(),
+            "eth4 should have a controller"
+        );
+
+        // Verify all expected connections exist
+        assert!(
+            find_connection_by_interface("bond0").is_some(),
+            "bond0 should exist"
+        );
+        assert!(
+            find_connection_by_interface("eth0").is_some(),
+            "eth0 should exist"
+        );
+        assert!(
+            find_connection_by_interface("eth1").is_some(),
+            "eth1 should exist"
+        );
+        assert!(
+            find_connection_by_interface("team0").is_some(),
+            "team0 should exist"
+        );
+        assert!(
+            find_connection_by_interface("eth2").is_some(),
+            "eth2 should exist"
+        );
+        assert!(
+            find_connection_by_interface("eth3").is_some(),
+            "eth3 should exist"
+        );
+        assert!(
+            find_connection_by_interface("eth4").is_some(),
+            "eth4 should exist"
+        );
+    }
 }
