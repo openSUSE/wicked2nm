@@ -2,7 +2,8 @@ use crate::interface::{ConnectionResult, Link, LinkPort, LinkPortType};
 use crate::netconfig::{apply_dns_policy, Netconfig};
 use crate::reader::InterfacesResult;
 use crate::MIGRATION_SETTINGS;
-use agama_network::model::{Connection, ConnectionConfig, IpConfig, MatchConfig, StateConfig};
+use agama_network::model::{Connection, ConnectionConfig, MatchConfig, StateConfig};
+use agama_network::types::{IpConfig, Ipv4Method, Ipv6Method};
 use agama_network::{model, Adapter, NetworkManagerAdapter, NetworkState};
 use cidr::IpInet;
 use nix::ifaddrs::getifaddrs;
@@ -115,8 +116,8 @@ fn create_lo_connection() -> Connection {
     Connection {
         id: "lo".to_string(),
         ip_config: IpConfig {
-            method4: model::Ipv4Method::Manual,
-            method6: model::Ipv6Method::Manual,
+            method4: Ipv4Method::Manual,
+            method6: Ipv6Method::Manual,
             addresses: vec![
                 IpInet::from_str("127.0.0.1/8").unwrap(),
                 IpInet::from_str("::1/128").unwrap(),
