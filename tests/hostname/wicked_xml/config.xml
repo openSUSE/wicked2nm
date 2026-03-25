@@ -10,7 +10,7 @@
   <ipv4:dhcp>
     <enabled>true</enabled>
     <flags>group</flags>
-    <update>default-route,dns,nis,ntp,nds,mtu,tz,boot</update>
+    <update>default-route,hostname,dns,nis,ntp,nds,mtu,tz,boot</update>
     <hostname>test-hostname-v4</hostname>
     <recover-lease>true</recover-lease>
     <release-lease>false</release-lease>
@@ -22,7 +22,7 @@
   <ipv6:dhcp>
     <enabled>true</enabled>
     <flags>group</flags>
-    <update>dns,nis,ntp,tz,boot</update>
+    <update>hostname,dns,nis,ntp,tz,boot</update>
     <mode>auto</mode>
     <rapid-commit>true</rapid-commit>
     <hostname>test-hostname-v6</hostname>
