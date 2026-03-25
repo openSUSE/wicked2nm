@@ -8,11 +8,11 @@ use crate::tuntap::Tun;
 use crate::vlan::Vlan;
 use crate::wireless::Wireless;
 use crate::MIGRATION_SETTINGS;
-use agama_network::model::{
-    self, Dhcp4Settings, Dhcp6Settings, IpConfig, IpRoute, Ipv4Method, Ipv6Method, LinkLocal,
-    MacAddress,
+use agama_network::model;
+use agama_network::types::{
+    Dhcp4Settings, Dhcp6Settings, DhcpClientId, DhcpDuid, DhcpIaid, IpConfig, IpRoute, Ipv4Method,
+    Ipv6Method, LinkLocal, MacAddress, Status,
 };
-use agama_network::types::Status;
 use cidr::IpInet;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, skip_serializing_none, DeserializeFromStr, SerializeDisplay};
@@ -704,16 +704,16 @@ impl Interface {
             }
             dhcp4_settings.send_release = Some(ipv4_dhcp.release_lease);
             dhcp4_settings.client_id = if let Some(client_id) = &ipv4_dhcp.client_id {
-                model::DhcpClientId::Id(client_id.clone())
+                DhcpClientId::Id(client_id.clone())
             } else {
                 match ipv4_dhcp.create_cid {
-                    CreateCid::Rfc4361 => model::DhcpClientId::Ipv6Duid,
-                    CreateCid::Rfc2132 => model::DhcpClientId::Mac,
-                    CreateCid::Disable => model::DhcpClientId::None,
+                    CreateCid::Rfc4361 => DhcpClientId::Ipv6Duid,
+                    CreateCid::Rfc2132 => DhcpClientId::Mac,
+                    CreateCid::Disable => DhcpClientId::None,
                 }
             };
-            dhcp4_settings.iaid = model::DhcpIaid::Mac;
-            dhcp6_settings.duid = model::DhcpDuid::Llt;
+            dhcp4_settings.iaid = DhcpIaid::Mac;
+            dhcp6_settings.duid = DhcpDuid::Llt;
         }
         let dhcp4_settings: Option<Dhcp4Settings> = Some(dhcp4_settings);
 
@@ -731,8 +731,8 @@ impl Interface {
                 dhcp6_settings.send_hostname = Some(false);
             }
             dhcp6_settings.send_release = Some(ipv6_dhcp.release_lease);
-            dhcp6_settings.iaid = model::DhcpIaid::Mac;
-            dhcp6_settings.duid = model::DhcpDuid::Llt;
+            dhcp6_settings.iaid = DhcpIaid::Mac;
+            dhcp6_settings.duid = DhcpDuid::Llt;
         }
         let dhcp6_settings: Option<Dhcp6Settings> = Some(dhcp6_settings);
 
@@ -1090,7 +1090,7 @@ mod tests {
                 .as_ref()
                 .unwrap()
                 .client_id,
-            model::DhcpClientId::Ipv6Duid
+            DhcpClientId::Ipv6Duid
         );
     }
 
@@ -1098,13 +1098,13 @@ mod tests {
     fn test_dhcp_create_cid() {
         setup_default_migration_settings();
         let tests = vec![
-            (CreateCid::Rfc4361, None, model::DhcpClientId::Ipv6Duid),
-            (CreateCid::Rfc2132, None, model::DhcpClientId::Mac),
-            (CreateCid::Disable, None, model::DhcpClientId::None),
+            (CreateCid::Rfc4361, None, DhcpClientId::Ipv6Duid),
+            (CreateCid::Rfc2132, None, DhcpClientId::Mac),
+            (CreateCid::Disable, None, DhcpClientId::None),
             (
                 CreateCid::Rfc4361,
                 Some("52:54:00:dc:8e:94".to_string()),
-                model::DhcpClientId::Id("52:54:00:dc:8e:94".to_string()),
+                DhcpClientId::Id("52:54:00:dc:8e:94".to_string()),
             ),
         ];
 
