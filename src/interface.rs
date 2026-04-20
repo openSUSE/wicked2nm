@@ -561,26 +561,29 @@ impl Interface {
         netconfig_dhcp: &Option<NetconfigDhcp>,
     ) -> Result<IpConfigResult, anyhow::Error> {
         let mut ipconfig_result = IpConfigResult::default();
-        let method4 = if self.ipv4_static.is_some() {
+        let method4 = if self.ipv4_dhcp.is_some() {
+            Ipv4Method::Auto
+        } else if self.ipv4_static.is_some() {
             Ipv4Method::Manual
         } else if !self.ipv4.enabled {
             Ipv4Method::Disabled
-        } else if self.ipv4_dhcp.is_some() {
-            Ipv4Method::Auto
         } else if self.ipv4_auto.is_some() {
             Ipv4Method::LinkLocal
         } else {
             Ipv4Method::Disabled
         };
-        let method6 = if self.ipv6_static.is_some() {
-            Ipv6Method::Manual
-        } else if self.ipv6_dhcp.is_some() && self.ipv6_dhcp.as_ref().unwrap().mode == "managed" {
-            Ipv6Method::Dhcp
-        } else if !self.ipv6.enabled {
-            Ipv6Method::Disabled
-        } else {
-            Ipv6Method::Auto
-        };
+        let method6 =
+            if self.ipv6_dhcp.is_some() && self.ipv6_dhcp.as_ref().unwrap().mode == "managed" {
+                Ipv6Method::Dhcp
+            } else if self.ipv6_dhcp.is_some() {
+                Ipv6Method::Auto
+            } else if self.ipv6_static.is_some() {
+                Ipv6Method::Manual
+            } else if !self.ipv6.enabled {
+                Ipv6Method::Disabled
+            } else {
+                Ipv6Method::Auto
+            };
 
         let link_local4 = if let Some(auto4) = &self.ipv4_auto {
             if auto4.enabled {

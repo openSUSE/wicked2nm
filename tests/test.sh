@@ -43,7 +43,7 @@ keep_connection() {
 }
 
 refresh_connections() {
-    local filename 
+    local filename
 
     CONNECTIONS=()
     while IFS= read -r -d '' filename ; do
@@ -82,15 +82,16 @@ print_help()
   echo "   ./test [ARGUMENTS] [TEST_DIRS]"
   echo ""
   echo "Arguments:"
-  echo "  -v|--verbose            Be more verbose"
-  echo "  --debug                 Prints out all commands executed"
-  echo "  -q|--quiet              Be less verbose"
-  echo "  --nm-cleanup            Cleanup current NetworkManager config before start"
-  echo "  -f|--force              Force decision (e.g. cleanup Connections)"
-  echo "  -k|--keep-connection    Connections will not be removed with --nm-cleanup"
-  echo "  --no-cleanup            Do not cleanup NetworkManger after test"
-  echo "  --no-wicked             If set, ifcfg tests do not fail when wicked isn't available"
-  echo "  -h|--help               Print this help"
+  echo "  -v|--verbose                 Be more verbose"
+  echo "  --debug                      Prints out all commands executed"
+  echo "  --binary <path>              Path to wicked2nm binary"
+  echo "  -q|--quiet                   Be less verbose"
+  echo "  --nm-cleanup                 Cleanup current NetworkManager config before start"
+  echo "  -f|--force                   Force decision (e.g. cleanup Connections)"
+  echo "  -k|--keep-connection <name>  Connections will not be removed with --nm-cleanup"
+  echo "  --no-cleanup                 Do not cleanup NetworkManger after test"
+  echo "  --no-wicked                  If set, ifcfg tests do not fail when wicked isn't available"
+  echo "  -h|--help                    Print this help"
 }
 
 POSITIONAL_ARGS=()
