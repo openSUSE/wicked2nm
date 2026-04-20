@@ -692,6 +692,7 @@ impl Interface {
         let mut dhcp4_settings: Dhcp4Settings = Dhcp4Settings::default();
         let mut dhcp6_settings: Dhcp6Settings = Dhcp6Settings::default();
 
+        let mut never_default4 = Some(false);
         if let Some(ipv4_dhcp) = &self.ipv4_dhcp {
             if let Some(hostname) = &ipv4_dhcp.hostname {
                 dhcp4_settings.send_hostname = Some(true);
@@ -717,6 +718,7 @@ impl Interface {
             };
             dhcp4_settings.iaid = DhcpIaid::Mac;
             dhcp6_settings.duid = DhcpDuid::Llt;
+            never_default4 = Some(!ipv4_dhcp.update.split(",").any(|x| x == "default-route"));
         }
         let dhcp4_settings: Option<Dhcp4Settings> = Some(dhcp4_settings);
 
@@ -754,6 +756,7 @@ impl Interface {
             dhcp6_settings,
             ip6_privacy,
             link_local4,
+            never_default4,
             ..Default::default()
         };
         Ok(ipconfig_result)
@@ -824,13 +827,13 @@ fn check_dhcp_update(update: &str, default_update: &str, interface_name: &str, d
     let default_set: HashSet<&str> = default_update
         .split(',')
         .map(|s| s.trim())
-        .filter(|s| !s.is_empty())
+        .filter(|s| !s.is_empty() && *s != "default-route")
         .collect();
 
     let update_set: HashSet<&str> = update
         .split(',')
         .map(|s| s.trim())
-        .filter(|s| !s.is_empty())
+        .filter(|s| !s.is_empty() && *s != "default-route")
         .collect();
 
     for missing in default_set.difference(&update_set) {
@@ -1241,7 +1244,7 @@ mod tests {
                     .iter()
                     .filter(|l| l.level == Level::Info)
                     .count(),
-                17
+                16
             );
         });
     }
