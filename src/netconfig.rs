@@ -21,19 +21,27 @@ pub fn read_netconfig(path: impl AsRef<Path>) -> Result<Netconfig, anyhow::Error
 fn handle_netconfig_values() -> Result<Netconfig, anyhow::Error> {
     let mut netconfig = Netconfig::default();
 
-    if let Ok(dns_policy) = dotenv::var("NETCONFIG_DNS_POLICY") {
+    if let Ok(mut dns_policy) = dotenv::var("NETCONFIG_DNS_POLICY") {
         if dns_policy == "auto" {
             netconfig.dns_policy = vec!["STATIC".to_string(), "*".to_string()];
         } else if !dns_policy.is_empty() {
+            // NetworkManager shouldn't apply here but in case it is still present
+            // netconfig just ignores everything after if wicked is used
+            dns_policy = dns_policy
+                .split_once("NetworkManager")
+                .map(|(before, _)| before.to_string())
+                .unwrap_or(dns_policy);
             if dns_policy.contains(&"STATIC_FALLBACK".to_string()) {
                 log::warn!("NETCONFIG_DNS_POLICY \"STATIC_FALLBACK\" is not supported");
                 netconfig.has_warning = true;
-            } else {
-                netconfig.dns_policy = dns_policy
-                    .split_ascii_whitespace()
-                    .map(|s| s.to_string())
-                    .collect();
+                // Replace STATIC_FALLBACK with STATIC at the end to somewhat mimic behaviour
+                dns_policy = dns_policy.replace("STATIC_FALLBACK", "");
+                dns_policy.push_str(" STATIC");
             }
+            netconfig.dns_policy = dns_policy
+                .split_ascii_whitespace()
+                .map(|s| s.to_string())
+                .collect();
         }
     }
     if let Ok(static_dns_servers) = dotenv::var("NETCONFIG_DNS_STATIC_SERVERS") {
@@ -128,6 +136,21 @@ mod tests {
 
         env::set_var("NETCONFIG_DNS_POLICY", "STATIC_FALLBACK");
         assert!(handle_netconfig_values().unwrap().has_warning);
+
+        // STATIC_FALLBACK should be replaced with STATIC at the end but contain a warning
+        // NetworkManager should have the effect that everything after (eth1) is ignored
+        env::set_var(
+            "NETCONFIG_DNS_POLICY",
+            "STATIC_FALLBACK eth0 NetworkManager eth1",
+        );
+        assert_eq!(
+            handle_netconfig_values().unwrap(),
+            Netconfig {
+                dns_policy: vec!["eth0".to_string(), "STATIC".to_string()],
+                has_warning: true,
+                ..Default::default()
+            }
+        );
 
         env::set_var("NETCONFIG_DNS_POLICY", "");
         env::set_var(
