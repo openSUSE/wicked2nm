@@ -1,0 +1,10 @@
+[connection]
+id=en1
+type=ethernet
+interface-name=en1
+master=team0
+slave-type=bond
+
+[ethernet]
+
+[match]

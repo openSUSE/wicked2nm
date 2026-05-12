@@ -1,0 +1,62 @@
+<interface origin="compat:suse:/tests/team_roundrobin_arp/netconfig/ifcfg-eth9">
+  <name>eth9</name>
+  <control>
+    <mode>hotplug</mode>
+  </control>
+  <link>
+    <master>team0</master>
+    <port type="team"/>
+  </link>
+  <ipv4>
+    <enabled>false</enabled>
+  </ipv4>
+  <ipv6>
+    <enabled>false</enabled>
+  </ipv6>
+</interface>
+<interface origin="compat:suse:/tests/team_roundrobin_arp/netconfig/ifcfg-team0">
+  <name>team0</name>
+  <control>
+    <mode>boot</mode>
+  </control>
+  <team>
+    <runner name="roundrobin"/>
+    <link_watch>
+      <watch name="arp_ping">
+        <target_host>10.10.10.254</target_host>
+        <interval>1000</interval>
+        <validate_active>true</validate_active>
+        <validate_inactive>true</validate_inactive>
+      </watch>
+    </link_watch>
+  </team>
+  <link/>
+  <ipv4>
+    <enabled>true</enabled>
+  </ipv4>
+  <ipv4:static>
+    <address>
+      <local>10.10.10.1/24</local>
+    </address>
+  </ipv4:static>
+  <ipv6>
+    <enabled>true</enabled>
+    <privacy>prefer-public</privacy>
+  </ipv6>
+</interface>
+<interface origin="compat:suse:/tests/team_roundrobin_arp/netconfig/ifcfg-eth8">
+  <name>eth8</name>
+  <control>
+    <mode>hotplug</mode>
+  </control>
+  <link>
+    <master>team0</master>
+    <port type="team"/>
+  </link>
+  <ipv4>
+    <enabled>false</enabled>
+  </ipv4>
+  <ipv6>
+    <enabled>false</enabled>
+  </ipv6>
+</interface>

@@ -3,6 +3,7 @@ use crate::bridge::Bridge;
 use crate::infiniband::{Infiniband, InfinibandChild};
 use crate::netconfig_dhcp::{HostnameOption, NetconfigDhcp};
 use crate::ovs::OvsBridge;
+use crate::team::Team;
 use crate::tuntap::Tap;
 use crate::tuntap::Tun;
 use crate::vlan::Vlan;
@@ -44,6 +45,7 @@ pub struct Interface {
     pub dummy: Option<Dummy>,
     pub ethernet: Option<Ethernet>,
     pub bond: Option<Bond>,
+    pub team: Option<Team>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub wireless: Option<Wireless>,
     #[serde(rename = "@origin")]
@@ -78,12 +80,20 @@ pub struct Link {
 
 #[skip_serializing_none]
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "kebab-case")]
 pub struct LinkPort {
     #[serde(rename = "@type")]
     pub port_type: LinkPortType,
+    // Bridge port options
     pub priority: Option<u32>,
+    #[serde(rename = "path-cost")]
     pub path_cost: Option<u32>,
+    // Team port options
+    pub queue_id: Option<u32>,
+    pub prio: Option<u32>,
+    #[serde(default)]
+    pub sticky: bool,
+    pub lacp_key: Option<u32>,
+    pub lacp_prio: Option<u32>,
 }
 
 #[derive(Debug, PartialEq, SerializeDisplay, DeserializeFromStr, EnumString, Display, Clone)]
@@ -92,6 +102,7 @@ pub enum LinkPortType {
     Bridge,
     Bond,
     OvsBridge,
+    Team,
 }
 
 fn default_true() -> bool {
@@ -393,6 +404,7 @@ impl From<&LinkPort> for model::PortConfig {
             }),
             LinkPortType::Bond => model::PortConfig::None,
             LinkPortType::OvsBridge => model::PortConfig::OvsBridge(model::OvsBridgePortConfig {}),
+            LinkPortType::Team => model::PortConfig::None,
         }
     }
 }
@@ -441,6 +453,37 @@ impl Interface {
                 };
                 connection.controller = Some(con_ovs_port.uuid);
                 connection_result.connections.push(con_ovs_port);
+            } else if let LinkPortType::Team = port.port_type {
+                // Warn about team port options that can't be translated
+                if let Some(queue_id) = port.queue_id {
+                    if let Some(master) = self.link.master.as_ref() {
+                        log::warn!(
+                            "Team port '{}' queue_id={} is not supported in NetworkManager bond configuration. \
+                             To set manually after bond creation: echo \"{}:{}\" > /sys/class/net/{}/bonding/queue_id",
+                            self.name, queue_id, self.name, queue_id, master
+                        );
+                    } else {
+                        log::warn!(
+                            "Team port '{}' queue_id={} is not supported in NetworkManager bond configuration.",
+                            self.name, queue_id
+                        );
+                    }
+                    connection_result.has_warnings = true;
+                }
+                if port.lacp_key.is_some() {
+                    log::warn!(
+                        "Team port '{}' lacp_key option is not supported in bond configuration",
+                        self.name
+                    );
+                    connection_result.has_warnings = true;
+                }
+                if port.lacp_prio.is_some() {
+                    log::warn!(
+                        "Team port '{}' lacp_prio option is not supported in kernel 6.12 - requires kernel 6.18+ (actor_port_prio)",
+                        self.name
+                    );
+                    connection_result.has_warnings = true;
+                }
             }
         }
 
@@ -463,6 +506,16 @@ impl Interface {
         } else if let Some(bond) = &self.bond {
             connection.custom_mac_address = MacAddress::try_from(&bond.address)?;
             connection.config = bond.into();
+            connection_result.connections.push(connection);
+        } else if let Some(team) = &self.team {
+            log::info!(
+                "Converting team interface '{}' to bond - team is no longer supported",
+                self.name
+            );
+            connection.custom_mac_address = MacAddress::try_from(&team.address)?;
+            let (config, has_warnings) = team.to_connection_config();
+            connection.config = config;
+            connection_result.has_warnings |= has_warnings;
             connection_result.connections.push(connection);
         } else if let Some(vlan) = &self.vlan {
             connection.custom_mac_address = MacAddress::try_from(&vlan.address)?;
@@ -1172,6 +1225,46 @@ mod tests {
     }
 
     #[test]
+    fn test_team_interface_address_to_connection() {
+        setup_default_migration_settings();
+        let team_interface = Interface {
+            team: Some(crate::team::Team {
+                address: Some("AA:BB:CC:DD:EE:FF".to_string()),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        let connection: &model::Connection =
+            &team_interface.to_connection(&None).unwrap().connections[0];
+        assert!(matches!(
+            connection.config,
+            model::ConnectionConfig::Bond(_)
+        ));
+        assert_eq!(
+            connection.custom_mac_address.to_string(),
+            "AA:BB:CC:DD:EE:FF"
+        );
+
+        // Test team without address
+        let team_interface = Interface {
+            team: Some(crate::team::Team {
+                address: None,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        let connection: &model::Connection =
+            &team_interface.to_connection(&None).unwrap().connections[0];
+        assert!(matches!(
+            connection.config,
+            model::ConnectionConfig::Bond(_)
+        ));
+        assert!(matches!(connection.custom_mac_address, MacAddress::Unset));
+    }
+
+    #[test]
     fn test_firewall_zone_to_connection() {
         setup_default_migration_settings();
         let ifc = Interface {
@@ -1368,5 +1461,49 @@ mod tests {
 
         let ip_result = ifc.to_ip_config(&None).unwrap();
         assert!(ip_result.has_warnings);
+    }
+
+    #[test]
+    fn test_team_port_queue_id_warning() {
+        setup_default_migration_settings();
+        testing_logger::setup();
+
+        let ifc = Interface {
+            name: "eth1".to_string(),
+            control: Control {
+                mode: ControlMode::Hotplug,
+                ..Default::default()
+            },
+            link: Link {
+                master: Some("team0".to_string()),
+                port: Some(LinkPort {
+                    port_type: LinkPortType::Team,
+                    priority: None,
+                    path_cost: None,
+                    queue_id: Some(2),
+                    prio: None,
+                    sticky: false,
+                    lacp_key: None,
+                    lacp_prio: None,
+                }),
+                ..Default::default()
+            },
+            ethernet: Some(Ethernet::default()),
+            ..Default::default()
+        };
+
+        let conn_res = ifc.to_connection(&None).unwrap();
+        assert!(conn_res.has_warnings);
+
+        testing_logger::validate(|captured_logs| {
+            let warnings: Vec<_> = captured_logs
+                .iter()
+                .filter(|l| l.level == Level::Warn)
+                .collect();
+            assert_eq!(warnings.len(), 1);
+            assert!(warnings[0]
+                .body
+                .contains("echo \"eth1:2\" > /sys/class/net/team0/bonding/queue_id"));
+        });
     }
 }

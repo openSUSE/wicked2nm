@@ -180,7 +180,7 @@ if [ ! -f $MIGRATE_WICKED_BIN ]; then
     exit 1
 fi
 
-for test_dir in ${TEST_DIRS}; do
+for test_dir in ${TEST_DIRS[@]}; do
     if [ ! -d "$SCRIPT_DIR/$test_dir" ]; then
         echo -e "${RED}[ERROR]${NC} Directory ${BOLD}$test_dir${NC} doesn't exists!"
         FAILED_TESTS+=("${test_dir}::test-dir-exists")

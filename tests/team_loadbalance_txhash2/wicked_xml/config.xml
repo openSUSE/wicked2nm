@@ -1,0 +1,65 @@
+<interface origin="compat:suse:/tests/team_loadbalance_txhash2/netconfig/ifcfg-eth9">
+  <name>eth9</name>
+  <control>
+    <mode>hotplug</mode>
+  </control>
+  <link>
+    <master>team0</master>
+    <port type="team"/>
+  </link>
+  <ipv4>
+    <enabled>false</enabled>
+  </ipv4>
+  <ipv6>
+    <enabled>false</enabled>
+  </ipv6>
+</interface>
+<interface origin="compat:suse:/tests/team_loadbalance_txhash2/netconfig/ifcfg-team0">
+  <name>team0</name>
+  <control>
+    <mode>boot</mode>
+  </control>
+  <team>
+    <runner name="loadbalance">
+      <tx_balancer>
+        <name>basic</name>
+        <balancing_interval>50</balancing_interval>
+      </tx_balancer>
+    </runner>
+    <link_watch>
+      <watch name="ethtool">
+        <delay_up>200</delay_up>
+        <delay_down>200</delay_down>
+      </watch>
+    </link_watch>
+  </team>
+  <link/>
+  <ipv4>
+    <enabled>true</enabled>
+  </ipv4>
+  <ipv4:static>
+    <address>
+      <local>172.16.0.1/16</local>
+    </address>
+  </ipv4:static>
+  <ipv6>
+    <enabled>true</enabled>
+    <privacy>prefer-public</privacy>
+  </ipv6>
+</interface>
+<interface origin="compat:suse:/tests/team_loadbalance_txhash2/netconfig/ifcfg-eth8">
+  <name>eth8</name>
+  <control>
+    <mode>hotplug</mode>
+  </control>
+  <link>
+    <master>team0</master>
+    <port type="team"/>
+  </link>
+  <ipv4>
+    <enabled>false</enabled>
+  </ipv4>
+  <ipv6>
+    <enabled>false</enabled>
+  </ipv6>
+</interface>
