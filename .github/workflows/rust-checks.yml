@@ -72,5 +72,6 @@ jobs:
       run: cargo tarpaulin --color always --skip-clean --target-dir target/tarpaulin --out xml
     - name: Coveralls GitHub Action
       uses: coverallsapp/github-action@v2
+      continue-on-error: true
       with:
         format: cobertura

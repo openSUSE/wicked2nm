@@ -30,6 +30,7 @@ impl From<&Vlan> for model::ConnectionConfig {
             parent: vlan.device.clone(),
             id: (vlan.tag as u32),
             protocol: (&vlan.protocol).into(),
+            ..Default::default()
         })
     }
 }

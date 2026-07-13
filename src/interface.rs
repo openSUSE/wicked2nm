@@ -801,8 +801,8 @@ impl Interface {
 
         ipconfig_result.ip_config = IpConfig {
             addresses,
-            method4,
-            method6,
+            method4: Some(method4),
+            method6: Some(method6),
             routes4,
             routes6,
             dhcp4_settings,
@@ -1083,12 +1083,18 @@ mod tests {
 
         let static_connection: model::Connection =
             static_interface.to_connection(&None).unwrap().connections[0].to_owned();
-        assert_eq!(static_connection.ip_config.method4, Ipv4Method::Manual);
+        assert_eq!(
+            static_connection.ip_config.method4,
+            Some(Ipv4Method::Manual)
+        );
         assert_eq!(
             static_connection.ip_config.addresses[0].to_string(),
             "127.0.0.1/8"
         );
-        assert_eq!(static_connection.ip_config.method6, Ipv6Method::Manual);
+        assert_eq!(
+            static_connection.ip_config.method6,
+            Some(Ipv6Method::Manual)
+        );
         assert_eq!(static_connection.ip_config.addresses[1].to_string(), "::1");
         assert_eq!(
             static_connection.ip_config.addresses[1]
@@ -1139,8 +1145,8 @@ mod tests {
 
         let dhcp_connection: model::Connection =
             dhcp_interface.to_connection(&None).unwrap().connections[0].to_owned();
-        assert_eq!(dhcp_connection.ip_config.method4, Ipv4Method::Auto);
-        assert_eq!(dhcp_connection.ip_config.method6, Ipv6Method::Auto);
+        assert_eq!(dhcp_connection.ip_config.method4, Some(Ipv4Method::Auto));
+        assert_eq!(dhcp_connection.ip_config.method6, Some(Ipv6Method::Auto));
         assert_eq!(dhcp_connection.ip_config.addresses.len(), 0);
         assert_eq!(
             dhcp_connection
@@ -1401,7 +1407,7 @@ mod tests {
         };
         let conn_res = ifc.to_connection(&None).unwrap();
         let connection = &conn_res.connections[0];
-        assert!(connection.ip_config.method4 == Ipv4Method::LinkLocal);
+        assert!(connection.ip_config.method4 == Some(Ipv4Method::LinkLocal));
         assert!(connection.ip_config.link_local4 == LinkLocal::Auto);
         assert!(!conn_res.has_warnings);
 
@@ -1414,7 +1420,7 @@ mod tests {
         };
         let conn_res = ifc.to_connection(&None).unwrap();
         let connection = &conn_res.connections[0];
-        assert!(connection.ip_config.method4 == Ipv4Method::LinkLocal);
+        assert!(connection.ip_config.method4 == Some(Ipv4Method::LinkLocal));
         assert!(connection.ip_config.link_local4 == LinkLocal::Auto);
         assert!(!conn_res.has_warnings);
 
@@ -1427,7 +1433,7 @@ mod tests {
         };
         let conn_res = ifc.to_connection(&None).unwrap();
         let connection = &conn_res.connections[0];
-        assert!(connection.ip_config.method4 == Ipv4Method::LinkLocal);
+        assert!(connection.ip_config.method4 == Some(Ipv4Method::LinkLocal));
         assert!(connection.ip_config.link_local4 == LinkLocal::Enabled);
         assert!(!conn_res.has_warnings);
     }

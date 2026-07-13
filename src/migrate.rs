@@ -258,8 +258,8 @@ fn create_lo_connection() -> Connection {
     Connection {
         id: "lo".to_string(),
         ip_config: IpConfig {
-            method4: Ipv4Method::Manual,
-            method6: Ipv6Method::Manual,
+            method4: Some(Ipv4Method::Manual),
+            method6: Some(Ipv6Method::Manual),
             addresses: vec![
                 IpInet::from_str("127.0.0.1/8").unwrap(),
                 IpInet::from_str("::1/128").unwrap(),
