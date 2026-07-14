@@ -1,3 +1,20 @@
+<interface origin="compat:suse:/tests/team_activebackup_nsna/netconfig/ifcfg-eth8">
+  <name>eth8</name>
+  <control>
+    <mode>hotplug</mode>
+  </control>
+  <link>
+    <master>team0</master>
+    <port type="team"/>
+  </link>
+  <ipv4>
+    <enabled>false</enabled>
+  </ipv4>
+  <ipv6>
+    <enabled>true</enabled>
+    <accept-ra>disable</accept-ra>
+  </ipv6>
+</interface>
 <interface origin="compat:suse:/tests/team_activebackup_nsna/netconfig/ifcfg-eth9">
   <name>eth9</name>
   <control>
@@ -45,21 +62,4 @@
       <local>2001:db8::1/64</local>
     </address>
   </ipv6:static>
-</interface>
-<interface origin="compat:suse:/tests/team_activebackup_nsna/netconfig/ifcfg-eth8">
-  <name>eth8</name>
-  <control>
-    <mode>hotplug</mode>
-  </control>
-  <link>
-    <master>team0</master>
-    <port type="team"/>
-  </link>
-  <ipv4>
-    <enabled>false</enabled>
-  </ipv4>
-  <ipv6>
-    <enabled>true</enabled>
-    <accept-ra>disable</accept-ra>
-  </ipv6>
 </interface>

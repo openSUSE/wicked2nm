@@ -1,34 +1,3 @@
-<interface origin="compat:suse:/tests/dhcp4_client_id/netconfig/ifcfg-eth6">
-  <name>eth6</name>
-  <control>
-    <mode>boot</mode>
-  </control>
-  <link/>
-  <ipv4>
-    <enabled>true</enabled>
-  </ipv4>
-  <ipv4:dhcp>
-    <enabled>true</enabled>
-    <flags>group</flags>
-    <update>default-route,hostname,dns,nis,ntp,nds,mtu,tz,boot</update>
-    <recover-lease>true</recover-lease>
-    <release-lease>false</release-lease>
-  </ipv4:dhcp>
-  <ipv6>
-    <enabled>true</enabled>
-    <privacy>prefer-public</privacy>
-  </ipv6>
-  <ipv6:dhcp>
-    <enabled>true</enabled>
-    <flags>group</flags>
-    <update>hostname,dns,nis,ntp,tz,boot</update>
-    <mode>auto</mode>
-    <rapid-commit>true</rapid-commit>
-    <recover-lease>true</recover-lease>
-    <refresh-lease>false</refresh-lease>
-    <release-lease>false</release-lease>
-  </ipv6:dhcp>
-</interface>
 <interface origin="compat:suse:/tests/dhcp4_client_id/netconfig/ifcfg-eth5">
   <name>eth5</name>
   <control>
@@ -61,8 +30,8 @@
     <release-lease>false</release-lease>
   </ipv6:dhcp>
 </interface>
-<interface origin="compat:suse:/tests/dhcp4_client_id/netconfig/ifcfg-eth9">
-  <name>eth9</name>
+<interface origin="compat:suse:/tests/dhcp4_client_id/netconfig/ifcfg-eth6">
+  <name>eth6</name>
   <control>
     <mode>boot</mode>
   </control>
@@ -76,7 +45,6 @@
     <update>default-route,hostname,dns,nis,ntp,nds,mtu,tz,boot</update>
     <recover-lease>true</recover-lease>
     <release-lease>false</release-lease>
-    <create-cid>rfc4361</create-cid>
   </ipv4:dhcp>
   <ipv6>
     <enabled>true</enabled>
@@ -141,6 +109,38 @@
     <recover-lease>true</recover-lease>
     <release-lease>false</release-lease>
     <create-cid>rfc2132</create-cid>
+  </ipv4:dhcp>
+  <ipv6>
+    <enabled>true</enabled>
+    <privacy>prefer-public</privacy>
+  </ipv6>
+  <ipv6:dhcp>
+    <enabled>true</enabled>
+    <flags>group</flags>
+    <update>hostname,dns,nis,ntp,tz,boot</update>
+    <mode>auto</mode>
+    <rapid-commit>true</rapid-commit>
+    <recover-lease>true</recover-lease>
+    <refresh-lease>false</refresh-lease>
+    <release-lease>false</release-lease>
+  </ipv6:dhcp>
+</interface>
+<interface origin="compat:suse:/tests/dhcp4_client_id/netconfig/ifcfg-eth9">
+  <name>eth9</name>
+  <control>
+    <mode>boot</mode>
+  </control>
+  <link/>
+  <ipv4>
+    <enabled>true</enabled>
+  </ipv4>
+  <ipv4:dhcp>
+    <enabled>true</enabled>
+    <flags>group</flags>
+    <update>default-route,hostname,dns,nis,ntp,nds,mtu,tz,boot</update>
+    <recover-lease>true</recover-lease>
+    <release-lease>false</release-lease>
+    <create-cid>rfc4361</create-cid>
   </ipv4:dhcp>
   <ipv6>
     <enabled>true</enabled>

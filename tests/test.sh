@@ -42,6 +42,23 @@ keep_connection() {
     return 1 # Not found
 }
 
+fixup_interface_xml_order() {
+    local file=${1:?Missing file argument}
+    gawk -v RS='</interface>' '
+/<interface/ {
+    sub(/^[[:space:]]+/, "", $0)
+    match($0, /<name>([^<]+)<\/name>/, m)
+    data[m[1]] = $0
+}
+END {
+    n = asorti(data, sorted)
+    for (i=1; i<=n; i++) {
+        printf "%s</interface>\n", data[sorted[i]]
+    }
+}' "$file" > "$file.tmp" &&
+    mv "$file.tmp" "$file"
+}
+
 refresh_connections() {
     local filename
 
@@ -67,7 +84,7 @@ nm_cleanup() {
         nmcli con delete "$UUID"
         while nmcli -t -f UUID c s | grep -P "^$UUID$" >/dev/null; do
           echo " -> Wait for $NAME($UUID) deletion"
-            sleep 1 
+            sleep 1
         done
     done
 }
@@ -97,7 +114,7 @@ print_help()
 POSITIONAL_ARGS=()
 
 while [[ $# -gt 0 ]]; do
-  opt=$1; 
+  opt=$1;
   shift;
   case $opt in
     -v|--verbose)
@@ -241,6 +258,8 @@ for test_dir in ${TEST_DIRS[@]}; do
         # https://unix.stackexchange.com/a/209744
         regex_esc_test_dir="$(printf '%s' "$test_dir" | sed 's/[\/.[\(*^$+?{|]/\\&/g')"
         sed -i -E 's/[^:]+(\/tests\/'"$regex_esc_test_dir"')/\1/' "$cfg_out"
+
+        fixup_interface_xml_order "$cfg_out"
     fi
 
     log_verbose "RUN: $MIGRATE_WICKED_BIN show $test_dir/wicked_xml"

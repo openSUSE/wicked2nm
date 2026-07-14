@@ -1,3 +1,19 @@
+<interface origin="compat:suse:/tests/team_random/netconfig/ifcfg-eth8">
+  <name>eth8</name>
+  <control>
+    <mode>hotplug</mode>
+  </control>
+  <link>
+    <master>team0</master>
+    <port type="team"/>
+  </link>
+  <ipv4>
+    <enabled>false</enabled>
+  </ipv4>
+  <ipv6>
+    <enabled>false</enabled>
+  </ipv6>
+</interface>
 <interface origin="compat:suse:/tests/team_random/netconfig/ifcfg-eth9">
   <name>eth9</name>
   <control>
@@ -40,21 +56,5 @@
   <ipv6>
     <enabled>true</enabled>
     <privacy>prefer-public</privacy>
-  </ipv6>
-</interface>
-<interface origin="compat:suse:/tests/team_random/netconfig/ifcfg-eth8">
-  <name>eth8</name>
-  <control>
-    <mode>hotplug</mode>
-  </control>
-  <link>
-    <master>team0</master>
-    <port type="team"/>
-  </link>
-  <ipv4>
-    <enabled>false</enabled>
-  </ipv4>
-  <ipv6>
-    <enabled>false</enabled>
   </ipv6>
 </interface>
