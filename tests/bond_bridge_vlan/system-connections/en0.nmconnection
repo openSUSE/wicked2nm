@@ -1,0 +1,11 @@
+[connection]
+id=en0
+uuid=0598a2b9-66ba-4034-acfa-4dcc23e1367b
+type=ethernet
+controller=bond0
+interface-name=en0
+port-type=bond
+
+[ethernet]
+
+[match]
