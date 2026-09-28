@@ -1,0 +1,6 @@
+STARTMODE='auto'
+BOOTPROTO='static'
+BRIDGE=yes
+BRIDGE_PORTS="bond0"
+IPADDR4='10.0.2.2/15'
+MTU='9000'

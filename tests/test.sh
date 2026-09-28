@@ -242,6 +242,8 @@ for test_dir in ${TEST_DIRS[@]}; do
             continue
         fi
 
+        ! test -d "$(dirname "$cfg_out")" && mkdir $(dirname "$cfg_out")
+
         wicked show-config --ifconfig compat:./netconfig \
             > "$cfg_out" \
             2> "$err_log"
@@ -276,7 +278,7 @@ for test_dir in ${TEST_DIRS[@]}; do
           FAILED_TESTS+=("${test_dir}::migrate")
           continue
       fi
-    else 
+    else
       if [ "$TEST_EXPECT_FAIL" = false ]; then
           error_msg ${test_dir} "migration failed"
           FAILED_TESTS+=("${test_dir}::migrate")
