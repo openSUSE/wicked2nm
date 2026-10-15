@@ -9,7 +9,6 @@ interface-name=eth7
 [match]
 
 [ipv4]
-dns-priority=20
 method=disabled
 
 [ipv6]

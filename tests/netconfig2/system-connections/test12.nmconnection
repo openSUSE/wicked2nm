@@ -9,12 +9,10 @@ interface-name=test12
 [match]
 
 [ipv4]
-ignore-auto-dns=true
 method=disabled
 
 [ipv6]
 addr-gen-mode=default
-ignore-auto-dns=true
 method=disabled
 
 [proxy]

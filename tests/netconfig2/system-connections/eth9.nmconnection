@@ -9,12 +9,10 @@ interface-name=eth9
 [match]
 
 [ipv4]
-dns-priority=10
 method=disabled
 
 [ipv6]
 addr-gen-mode=default
-dns-priority=10
 method=disabled
 
 [proxy]

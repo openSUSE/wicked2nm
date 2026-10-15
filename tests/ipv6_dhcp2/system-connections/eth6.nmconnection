@@ -9,7 +9,6 @@ interface-name=eth6
 [match]
 
 [ipv4]
-ignore-auto-dns=true
 method=disabled
 
 [ipv6]
