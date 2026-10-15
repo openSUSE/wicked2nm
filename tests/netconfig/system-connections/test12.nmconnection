@@ -9,12 +9,10 @@ interface-name=test12
 [match]
 
 [ipv4]
-dns-priority=20
 method=disabled
 
 [ipv6]
 addr-gen-mode=default
-dns-priority=20
 method=disabled
 
 [proxy]
