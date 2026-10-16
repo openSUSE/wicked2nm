@@ -21,7 +21,7 @@ dns-priority=20
 method=manual
 
 [ipv6]
-addr-gen-mode=default
+addr-gen-mode=eui64
 address1=fddd:c000:200::131/64
 dns-priority=20
 ip6-privacy=1

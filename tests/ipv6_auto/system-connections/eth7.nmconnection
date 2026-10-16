@@ -12,7 +12,7 @@ interface-name=eth7
 method=disabled
 
 [ipv6]
-addr-gen-mode=default
+addr-gen-mode=eui64
 dns-priority=20
 ip6-privacy=1
 method=auto

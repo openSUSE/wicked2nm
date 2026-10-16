@@ -12,7 +12,7 @@ interface-name=eth6
 method=disabled
 
 [ipv6]
-addr-gen-mode=default
+addr-gen-mode=eui64
 dhcp-duid=llt
 dhcp-iaid=mac
 dhcp-send-hostname=1
