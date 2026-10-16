@@ -18,7 +18,7 @@ ignore-auto-dns=true
 method=auto
 
 [ipv6]
-addr-gen-mode=default
+addr-gen-mode=eui64
 dhcp-duid=llt
 dhcp-hostname=test-hostname-v6
 dhcp-iaid=mac
