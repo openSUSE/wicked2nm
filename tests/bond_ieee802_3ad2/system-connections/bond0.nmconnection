@@ -22,7 +22,7 @@ ignore-auto-dns=true
 method=manual
 
 [ipv6]
-addr-gen-mode=default
+addr-gen-mode=eui64
 address1=2620:113:80c0:8200::11/64
 ignore-auto-dns=true
 ip6-privacy=1
