@@ -12,7 +12,7 @@ interface-name=eth5
 method=disabled
 
 [ipv6]
-addr-gen-mode=default
+addr-gen-mode=eui64
 address1=2001:db8:0:1::5/64
 address2=2001:db8:0:2::5/64
 ip6-privacy=1

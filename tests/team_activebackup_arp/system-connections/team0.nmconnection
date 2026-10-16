@@ -23,7 +23,7 @@ address1=192.168.50.1/24
 method=manual
 
 [ipv6]
-addr-gen-mode=default
+addr-gen-mode=eui64
 ip6-privacy=1
 method=auto
 

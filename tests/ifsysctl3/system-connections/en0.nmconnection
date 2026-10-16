@@ -14,7 +14,7 @@ ignore-auto-dns=true
 method=manual
 
 [ipv6]
-addr-gen-mode=default
+addr-gen-mode=stable-privacy
 address1=fc00:dead:beaf::1/64
 ignore-auto-dns=true
 ip6-privacy=1

@@ -17,7 +17,7 @@ link-local=3
 method=auto
 
 [ipv6]
-addr-gen-mode=default
+addr-gen-mode=eui64
 dhcp-duid=llt
 dhcp-iaid=mac
 dhcp-send-hostname=false
