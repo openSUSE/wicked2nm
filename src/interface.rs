@@ -964,12 +964,13 @@ fn has_unhandled_field(interface: &Interface) -> bool {
             warnings = true;
         }
         if ipv4_dhcp.recover_lease != ipv4_dhcp_default.recover_lease {
-            log::warn!(
-                "Unhandled field in interface {}: {}",
-                interface.name,
-                stringify!(ipv4_dhcp.recover_lease)
+            // NetworkManager has no equivalent setting; it always asks for the last leased
+            // address and falls back to a new lease if the server refuses, so the result is the same
+            log::info!(
+                "{} in interface {} is disabled, but NetworkManager always tries to reuse the last lease",
+                stringify!(ipv4_dhcp.recover_lease),
+                interface.name
             );
-            warnings = true;
         }
     }
 
@@ -1336,15 +1337,34 @@ mod tests {
                     .iter()
                     .filter(|l| l.level == Level::Warn)
                     .count(),
-                9
+                8
             );
             assert_eq!(
                 captured_logs
                     .iter()
                     .filter(|l| l.level == Level::Info)
                     .count(),
-                16
+                17
             );
+        });
+    }
+
+    #[test]
+    fn test_ipv4_recover_lease_disabled_is_not_a_warning() {
+        testing_logger::setup();
+        let ifc = Interface {
+            ipv4_dhcp: Some(Ipv4Dhcp {
+                recover_lease: false,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        assert!(!has_unhandled_field(&ifc));
+        testing_logger::validate(|captured_logs| {
+            assert!(captured_logs.iter().all(|l| l.level != Level::Warn));
+            assert!(captured_logs
+                .iter()
+                .any(|l| l.level == Level::Info && l.body.contains("recover_lease")));
         });
     }
 
