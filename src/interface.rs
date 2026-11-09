@@ -10,6 +10,7 @@ use crate::vlan::Vlan;
 use crate::wireless::Wireless;
 use crate::MIGRATION_SETTINGS;
 use agama_network::model;
+use agama_network::types::Ip6AddrGenMode as AgamaIp6AddrGenMode;
 use agama_network::types::{
     Dhcp4Settings, Dhcp6Settings, DhcpClientId, DhcpDuid, DhcpIaid, IpConfig, IpRoute, Ipv4Method,
     Ipv6Method, LinkLocal, MacAddress, Status,
@@ -132,6 +133,8 @@ pub struct Ipv6 {
     #[serde(default = "default_true")]
     pub enabled: bool,
     pub privacy: Option<Ip6Privacy>,
+    #[serde(rename = "addr-gen-mode")]
+    pub addr_gen_mode: Option<Ip6AddrGenMode>,
     // ignored
     #[serde(rename = "accept-redirects", default)]
     pub accept_redirects: bool,
@@ -148,12 +151,25 @@ pub enum Ip6Privacy {
     PreferTemporary = 2,
 }
 
+#[derive(
+    Debug, PartialEq, Default, SerializeDisplay, DeserializeFromStr, EnumString, Clone, Display,
+)]
+#[strum(serialize_all = "kebab-case")]
+pub enum Ip6AddrGenMode {
+    #[default]
+    Eui64 = 0,
+    None = 1,
+    StablePrivacy = 2,
+    Random = 3,
+}
+
 impl Default for Ipv6 {
     fn default() -> Self {
         Self {
             enabled: true,
             privacy: None,
             accept_redirects: false,
+            addr_gen_mode: None,
         }
     }
 }
@@ -799,6 +815,18 @@ impl Interface {
             ip6_privacy = Some(privacy.clone() as i32);
         }
 
+        let ip6_addr_gen_mode = match self.ipv6.addr_gen_mode.as_ref() {
+            None | Some(Ip6AddrGenMode::Eui64) => Some(AgamaIp6AddrGenMode::Eui64),
+            Some(Ip6AddrGenMode::StablePrivacy) => Some(AgamaIp6AddrGenMode::StablePrivacy),
+            Some(Ip6AddrGenMode::Random) => {
+                if ip6_privacy.is_none() {
+                    ip6_privacy = Some(2)
+                }
+                Some(AgamaIp6AddrGenMode::StablePrivacy)
+            }
+            Some(Ip6AddrGenMode::None) => None,
+        };
+
         ipconfig_result.ip_config = IpConfig {
             addresses,
             method4: Some(method4),
@@ -808,6 +836,7 @@ impl Interface {
             dhcp4_settings,
             dhcp6_settings,
             ip6_privacy,
+            ip6_addr_gen_mode,
             link_local4,
             never_default4,
             ..Default::default()

@@ -15,7 +15,7 @@ address1=10.0.0.101/24
 method=manual
 
 [ipv6]
-addr-gen-mode=default
+addr-gen-mode=eui64
 address1=2001:db8:1::2/64
 ip6-privacy=1
 method=manual

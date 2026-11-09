@@ -59,7 +59,6 @@ pub const IGNORED_FIELDS: &[&str] = &[
     "ipv4.forwarding",
     "ipv6.accept-dad",
     "ipv6.accept-ra",
-    "ipv6.addr-gen-mode",
     "ipv6.autoconf",
     "ipv6.forwarding",
     "ipv6.stable-secret",

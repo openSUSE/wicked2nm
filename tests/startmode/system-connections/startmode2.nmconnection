@@ -15,7 +15,7 @@ interface-name=startmode2
 method=disabled
 
 [ipv6]
-addr-gen-mode=default
+addr-gen-mode=eui64
 method=auto
 
 [proxy]
