@@ -19,7 +19,7 @@ ns_ip6_target=2001:db8::254
 method=disabled
 
 [ipv6]
-addr-gen-mode=default
+addr-gen-mode=eui64
 address1=2001:db8::1/64
 ip6-privacy=1
 method=manual

@@ -23,7 +23,7 @@ route2=10.23.2.0/24,192.168.2.200
 route3=0.0.0.0/0,192.168.2.1
 
 [ipv6]
-addr-gen-mode=default
+addr-gen-mode=eui64
 dhcp-duid=llt
 dhcp-iaid=mac
 dhcp-send-hostname-deprecated=false
